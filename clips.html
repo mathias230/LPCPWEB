@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clips - Liga Panameña de Clubes Pro</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <i class="fas fa-trophy"></i>
+                <span>LPCP</span>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="index.html" class="nav-link">Inicio</a></li>
+                <li><a href="index.html#liga" class="nav-link">La Liga</a></li>
+                <li><a href="index.html#clubes" class="nav-link">Clubes</a></li>
+                <li><a href="index.html#temporada" class="nav-link">Temporada</a></li>
+                <li><a href="clips.html" class="nav-link active">Clips</a></li>
+                <li><a href="standings.html" class="nav-link">Posiciones</a></li>
+                <li><a href="index.html#contacto" class="nav-link">Contacto</a></li>
+            </ul>
+            <div class="hamburger">
+                <span class="bar"></span>
+                <span class="bar"></span>
+                <span class="bar"></span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Clips Hero Section -->
+    <section class="clips-hero">
+        <div class="hero-background">
+            <div class="floating-particles"></div>
+            <div class="grid-overlay"></div>
+        </div>
+        <div class="hero-content">
+            <h1 class="hero-title">
+                <span class="typewriter-text">Clips de la Liga Panameña</span>
+            </h1>
+            <p class="hero-subtitle">Los mejores momentos del fútbol virtual panameño</p>
+            <div class="clips-actions">
+                <button class="btn-primary upload-btn" id="uploadBtn">
+                    <i class="fas fa-upload"></i>
+                    Subir Clip
+                </button>
+                <button class="btn-secondary filter-btn" id="filterBtn">
+                    <i class="fas fa-filter"></i>
+                    Filtrar
+                </button>
+            </div>
+            
+            <!-- Filter Options -->
+            <div class="filter-options" id="filterOptions" style="display: none;">
+                <div class="filter-group">
+                    <label>Tipo de Clip:</label>
+                    <div class="filter-tags">
+                        <button class="filter-tag active" data-filter="all">Todos</button>
+                        <button class="filter-tag" data-filter="goles">Goles</button>
+                        <button class="filter-tag" data-filter="asistencias">Asistencias</button>
+                        <button class="filter-tag" data-filter="atajadas">Atajadas</button>
+                        <button class="filter-tag" data-filter="jugadas">Jugadas</button>
+                        <button class="filter-tag" data-filter="celebraciones">Celebraciones</button>
+                        <button class="filter-tag" data-filter="faltas">Faltas</button>
+                        <button class="filter-tag" data-filter="penales">Penales</button>
+                    </div>
+                </div>
+                <div class="filter-group">
+                    <label>Club:</label>
+                    <div class="filter-tags">
+                        <button class="filter-tag active" data-club-filter="all">Todos</button>
+                        <button class="filter-tag" data-club-filter="ACP 507">ACP 507</button>
+                        <button class="filter-tag" data-club-filter="Coiner FC">Coiner FC</button>
+                        <button class="filter-tag" data-club-filter="FC WEST SIDE">FC WEST SIDE</button>
+                        <button class="filter-tag" data-club-filter="Humacao Fc">Humacao Fc</button>
+                        <button class="filter-tag" data-club-filter="Punta Coco Fc">Punta Coco Fc</button>
+                        <button class="filter-tag" data-club-filter="Pura Vibra">Pura Vibra</button>
+                        <button class="filter-tag" data-club-filter="Raven Law">Raven Law</button>
+                        <button class="filter-tag" data-club-filter="Rayos X Fc">Rayos X Fc</button>
+                        <button class="filter-tag" data-club-filter="Tiki Taka Fc">Tiki Taka Fc</button>
+                        <button class="filter-tag" data-club-filter="fly city">fly city</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Upload Modal -->
+    <div id="uploadModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Subir Nuevo Clip</h2>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="uploadForm">
+                    <div class="form-group">
+                        <label for="clipTitle">Título del Clip</label>
+                        <input type="text" id="clipTitle" name="clipTitle" required placeholder="Ej: Gol espectacular de último minuto">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="clipDescription">Descripción</label>
+                        <textarea id="clipDescription" name="clipDescription" required placeholder="Describe lo que sucede en el clip..."></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="clipType">Tipo de Clip</label>
+                        <select id="clipType" name="clipType" required>
+                            <option value="">Selecciona el tipo de clip</option>
+                            <option value="goles">Goles</option>
+                            <option value="asistencias">Asistencias</option>
+                            <option value="atajadas">Atajadas</option>
+                            <option value="jugadas">Jugadas Especiales</option>
+                            <option value="celebraciones">Celebraciones</option>
+                            <option value="faltas">Faltas</option>
+                            <option value="penales">Penales</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="clubSelect">Club</label>
+                        <select id="clubSelect" name="clubSelect" required>
+                            <option value="">Selecciona tu club</option>
+                            <option value="ACP 507">ACP 507</option>
+                            <option value="Coiner FC">Coiner FC</option>
+                            <option value="FC WEST SIDE">FC WEST SIDE</option>
+                            <option value="Humacao Fc">Humacao Fc</option>
+                            <option value="Punta Coco Fc">Punta Coco Fc</option>
+                            <option value="Pura Vibra">Pura Vibra</option>
+                            <option value="Raven Law">Raven Law</option>
+                            <option value="Rayos X Fc">Rayos X Fc</option>
+                            <option value="Tiki Taka Fc">Tiki Taka Fc</option>
+                            <option value="fly city">fly city</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="clipFile">Archivo de Video</label>
+                        <div class="file-upload">
+                            <input type="file" id="clipFile" name="clipFile" accept="video/*" required>
+                            <label for="clipFile" class="file-upload-label">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <span>Seleccionar archivo de video</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="button" class="btn-secondary" id="cancelUpload">Cancelar</button>
+                        <button type="submit" class="btn-primary">
+                            <i class="fas fa-upload"></i>
+                            Subir Clip
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Clips Gallery -->
+    <section class="clips-gallery">
+        <div class="container">
+            <div class="gallery-header">
+                <div class="gallery-stats">
+                    <span class="stat-item">
+                        <i class="fas fa-video"></i>
+                        <span class="stat-number" id="totalClips">0</span>
+                        <span class="stat-label">Clips Totales</span>
+                    </span>
+                    <span class="stat-item">
+                        <i class="fas fa-eye"></i>
+                        <span class="stat-number" id="totalViews">0</span>
+                        <span class="stat-label">Visualizaciones</span>
+                    </span>
+                    <span class="stat-item">
+                        <i class="fas fa-heart"></i>
+                        <span class="stat-number" id="totalLikes">0</span>
+                        <span class="stat-label">Me Gusta</span>
+                    </span>
+                </div>
+                
+                <div class="gallery-filters">
+                    <button class="filter-btn active" data-filter="all">Todos</button>
+                    <button class="filter-btn" data-filter="goles">Goles</button>
+                    <button class="filter-btn" data-filter="asistencias">Asistencias</button>
+                    <button class="filter-btn" data-filter="atajadas">Atajadas</button>
+                    <button class="filter-btn" data-filter="jugadas">Jugadas</button>
+                    <button class="filter-btn" data-filter="celebraciones">Celebraciones</button>
+                    <button class="filter-btn" data-filter="faltas">Faltas</button>
+                    <button class="filter-btn" data-filter="penales">Penales</button>
+                </div>
+            </div>
+            
+            <div class="clips-grid" id="clipsGrid">
+                <!-- Clips will be loaded here dynamically -->
+            </div>
+            
+            <div class="load-more">
+                <button class="btn-primary" id="loadMoreBtn">
+                    <i class="fas fa-plus"></i>
+                    Cargar Más Clips
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Video Modal -->
+    <div id="videoModal" class="video-modal">
+        <div class="video-modal-content">
+            <div class="video-modal-header">
+                <div>
+                    <h3 class="video-modal-title" id="videoTitle">Título del Clip</h3>
+                    <div class="video-modal-info">
+                        <span id="videoClub"><i class="fas fa-shield-alt"></i> Club</span>
+                        <span id="videoDate"><i class="fas fa-calendar"></i> Fecha</span>
+                    </div>
+                </div>
+                <button class="video-close" id="videoClose">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="video-container">
+                <video id="videoPlayer" controls>
+                    <source src="" type="video/mp4">
+                    Tu navegador no soporta el elemento de video.
+                </video>
+                <div class="video-loading" id="videoLoading">
+                    <div class="video-loading-spinner"></div>
+                    <p>Cargando video...</p>
+                </div>
+            </div>
+            
+            <div class="video-controls">
+                <p class="video-description" id="videoDescription">Descripción del clip</p>
+                
+                <div class="video-stats">
+                    <div class="video-stat">
+                        <i class="fas fa-eye"></i>
+                        <span id="videoViews">0</span> visualizaciones
+                    </div>
+                    <div class="video-stat">
+                        <i class="fas fa-heart"></i>
+                        <span id="videoLikes">0</span> me gusta
+                    </div>
+                    <div class="video-stat">
+                        <i class="fas fa-clock"></i>
+                        <span id="videoDuration">0:00</span>
+                    </div>
+                </div>
+                
+                <div class="video-actions">
+                    <button class="video-action-btn" id="likeVideoBtn">
+                        <i class="fas fa-heart"></i>
+                        Me gusta
+                    </button>
+                    <button class="video-action-btn" id="shareVideoBtn">
+                        <i class="fas fa-share"></i>
+                        Compartir
+                    </button>
+                    <button class="video-action-btn" id="downloadVideoBtn">
+                        <i class="fas fa-download"></i>
+                        Descargar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-logo">
+                    <i class="fas fa-trophy"></i>
+                    <span>LPCP</span>
+                </div>
+                <p>&copy; 2025 Liga Panameña de Clubes Pro. Diseño por: Web Zen design Studio.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="clips.js"></script>
+</body>
+</html>
