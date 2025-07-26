@@ -428,16 +428,17 @@ async function loadRecentClipsPreview() {
                 // Display real clips from server
                 displayRecentClips(clips);
             } else {
-                // Show placeholder when no clips exist
+                // Show message when no clips exist
                 showNoClipsMessage();
             }
         } else {
-            throw new Error('Server not available');
+            // If server error, show message instead of placeholders
+            showNoClipsMessage();
         }
     } catch (error) {
-        console.log('Server not available, showing placeholder clips');
-        // Show placeholder clips when server is not available
-        showPlaceholderClips();
+        console.log('Error loading clips:', error);
+        // Show message instead of placeholders when there's an error
+        showNoClipsMessage();
     }
 }
 
@@ -491,11 +492,11 @@ function showNoClipsMessage() {
     previewContainer.innerHTML = `
         <div class="no-clips-message">
             <i class="fas fa-video"></i>
-            <h3>¡Sé el primero en subir un clip!</h3>
-            <p>Aún no hay clips subidos. Comparte los mejores momentos de tus partidos.</p>
+            <h3>No hay clips recientes</h3>
+            <p>Los clips más recientes aparecerán aquí. Visita la sección de clips para ver más contenido.</p>
             <a href="clips.html" class="btn-primary">
-                <i class="fas fa-upload"></i>
-                Subir Primer Clip
+                <i class="fas fa-video"></i>
+                Ver Todos los Clips
             </a>
         </div>
     `;

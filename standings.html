@@ -13,7 +13,9 @@
     <nav class="navbar">
         <div class="nav-container">
             <div class="nav-logo">
-                <i class="fas fa-trophy"></i>
+                <div class="logo-circle">
+                    <img src="/img/LPCP Logo.jpg" alt="Logo LPCP" class="logo-img">
+                </div>
                 <span>LPCP</span>
             </div>
             <ul class="nav-menu">
@@ -57,7 +59,7 @@
                 </div>
                 <div class="season-stat">
                     <i class="fas fa-users"></i>
-                    <span>10 Equipos</span>
+                    <span>12 Equipos</span>
                 </div>
             </div>
         </div>
@@ -138,25 +140,12 @@
             </div>
 
             <!-- Fixtures Tab -->
-            <div class="tab-content" id="fixtures">
-                <div class="fixtures-container">
-                    <h2 class="section-title">
-                        <i class="fas fa-calendar-check"></i>
-                        Próximos Partidos
-                    </h2>
-                    
-                    <div class="matchday-selector">
-                        <button class="matchday-btn" id="prevMatchday">
-                            <i class="fas fa-chevron-left"></i>
-                        </button>
-                        <span class="matchday-title" id="fixturesMatchday">Jornada 1</span>
-                        <button class="matchday-btn" id="nextMatchday">
-                            <i class="fas fa-chevron-right"></i>
-                        </button>
-                    </div>
-
-                    <div class="fixtures-grid" id="fixturesGrid">
-                        <!-- Fixtures will be loaded here dynamically -->
+            <div class="tab-content fixtures-section" id="fixtures">
+                <div class="fixtures-container" id="fixturesContainer">
+                    <!-- Contenido generado dinámicamente por JavaScript -->
+                    <div class="loading-fixtures">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <p>Cargando partidos...</p>
                     </div>
                 </div>
             </div>

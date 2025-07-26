@@ -74,15 +74,17 @@ let stats = {
 // Datos estáticos de la liga (se actualizan manualmente en el código)
 let standings = [
     { position: 1, team: 'ACP 507', played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, goalDifference: 0, points: 0 },
-    { position: 2, team: 'Coiner FC', played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, goalDifference: 0, points: 0 },
-    { position: 3, team: 'FC WEST SIDE', played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, goalDifference: 0, points: 0 },
-    { position: 4, team: 'Humacao Fc', played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, goalDifference: 0, points: 0 },
-    { position: 5, team: 'Punta Coco Fc', played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, goalDifference: 0, points: 0 },
-    { position: 6, team: 'Pura Vibra', played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, goalDifference: 0, points: 0 },
-    { position: 7, team: 'Raven Law', played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, goalDifference: 0, points: 0 },
-    { position: 8, team: 'Rayos X Fc', played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, goalDifference: 0, points: 0 },
-    { position: 9, team: 'Tiki Taka Fc', played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, goalDifference: 0, points: 0 },
-    { position: 10, team: 'fly city', played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, goalDifference: 0, points: 0 }
+    { position: 2, team: 'BKS FC', played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, goalDifference: 0, points: 0 },
+    { position: 3, team: 'Coiner FC', played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, goalDifference: 0, points: 0 },
+    { position: 4, team: 'FC WEST SIDE', played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, goalDifference: 0, points: 0 },
+    { position: 5, team: 'Humacao FC', played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, goalDifference: 0, points: 0 },
+    { position: 6, team: 'Jumpers FC', played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, goalDifference: 0, points: 0 },
+    { position: 7, team: 'LOS PLEBES Tk', played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, goalDifference: 0, points: 0 },
+    { position: 8, team: 'Punta Coco FC', played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, goalDifference: 0, points: 0 },
+    { position: 9, team: 'Pura Vibra', played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, goalDifference: 0, points: 0 },
+    { position: 10, team: 'Rayos X FC', played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, goalDifference: 0, points: 0 },
+    { position: 11, team: 'Tiki Taka FC', played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, goalDifference: 0, points: 0 },
+    { position: 12, team: 'WEST SIDE PTY', played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, goalDifference: 0, points: 0 }
 ];
 
 let matches = [];
@@ -97,15 +99,17 @@ let settings = {
 // Equipos de la Liga Panameña de Clubes Pro
 const teams = [
     { id: 1, name: 'ACP 507', founded: 2020, stadium: 'Estadio ACP' },
-    { id: 2, name: 'Coiner FC', founded: 2019, stadium: 'Campo Coiner' },
-    { id: 3, name: 'FC WEST SIDE', founded: 2021, stadium: 'West Side Arena' },
-    { id: 4, name: 'Humacao Fc', founded: 2020, stadium: 'Estadio Humacao' },
-    { id: 5, name: 'Punta Coco Fc', founded: 2018, stadium: 'Punta Coco Field' },
-    { id: 6, name: 'Pura Vibra', founded: 2022, stadium: 'Vibra Stadium' },
-    { id: 7, name: 'Raven Law', founded: 2019, stadium: 'Law Arena' },
-    { id: 8, name: 'Rayos X Fc', founded: 2020, stadium: 'Rayos Stadium' },
-    { id: 9, name: 'Tiki Taka Fc', founded: 2021, stadium: 'Tiki Taka Field' },
-    { id: 10, name: 'fly city', founded: 2020, stadium: 'Fly City Arena' }
+    { id: 2, name: 'BKS FC', founded: 2023, stadium: 'BKS Stadium' },
+    { id: 3, name: 'Coiner FC', founded: 2019, stadium: 'Campo Coiner' },
+    { id: 4, name: 'FC WEST SIDE', founded: 2021, stadium: 'West Side Arena' },
+    { id: 5, name: 'Humacao FC', founded: 2020, stadium: 'Estadio Humacao' },
+    { id: 6, name: 'Jumpers FC', founded: 2022, stadium: 'Jumpers Arena' },
+    { id: 7, name: 'LOS PLEBES Tk', founded: 2021, stadium: 'Estadio Los Plebes' },
+    { id: 8, name: 'Punta Coco FC', founded: 2018, stadium: 'Punta Coco Field' },
+    { id: 9, name: 'Pura Vibra', founded: 2022, stadium: 'Vibra Stadium' },
+    { id: 10, name: 'Rayos X FC', founded: 2020, stadium: 'Rayos Stadium' },
+    { id: 11, name: 'Tiki Taka FC', founded: 2021, stadium: 'Tiki Taka Field' },
+    { id: 12, name: 'WEST SIDE PTY', founded: 2023, stadium: 'West Side Stadium' }
 ];
 
 // Cargar datos existentes solo para clips
