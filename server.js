@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
@@ -5,6 +6,7 @@ const fs = require('fs');
 const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
+const cloudinary = require('cloudinary').v2;
 
 const app = express();
 const server = http.createServer(app);
@@ -16,6 +18,13 @@ const io = socketIo(server, {
 });
 
 const PORT = process.env.PORT || 8000;
+
+// Configuración de Cloudinary
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET
+});
 
 // Middleware
 app.use(cors());
@@ -34,16 +43,8 @@ if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
 }
 
-// Configuración de multer para subida de archivos
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, uploadsDir);
-    },
-    filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, 'clip-' + uniqueSuffix + path.extname(file.originalname));
-    }
-});
+// Configuración de multer para subida de archivos (usando memoria para Cloudinary)
+const storage = multer.memoryStorage();
 
 const upload = multer({
     storage: storage,
@@ -219,7 +220,7 @@ app.get('/api/clips', (req, res) => {
 });
 
 // Subir nuevo clip
-app.post('/api/upload', upload.single('clipFile'), (req, res) => {
+app.post('/api/upload', upload.single('clipFile'), async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ success: false, error: 'No se subió ningún archivo' });
@@ -234,14 +235,38 @@ app.post('/api/upload', upload.single('clipFile'), (req, res) => {
             });
         }
 
-        // Crear nuevo clip
+        // Subir video a Cloudinary
+        const uploadResult = await new Promise((resolve, reject) => {
+            const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+            const publicId = `lpcp-clips/clip-${uniqueSuffix}`;
+            
+            cloudinary.uploader.upload_stream(
+                {
+                    resource_type: 'video',
+                    public_id: publicId,
+                    folder: 'lpcp-clips',
+                    quality: 'auto',
+                    format: 'mp4'
+                },
+                (error, result) => {
+                    if (error) {
+                        reject(error);
+                    } else {
+                        resolve(result);
+                    }
+                }
+            ).end(req.file.buffer);
+        });
+
+        // Crear nuevo clip con URL de Cloudinary
         const newClip = {
             id: Date.now().toString(),
             title: clipTitle,
             description: clipDescription,
             type: clipType,
             club: clubSelect,
-            filename: req.file.filename,
+            filename: uploadResult.public_id, // Guardamos el public_id de Cloudinary
+            video_url: uploadResult.secure_url, // URL segura del video
             upload_date: new Date().toISOString(),
             views: 0,
             likes: 0,
@@ -273,7 +298,7 @@ app.post('/api/upload', upload.single('clipFile'), (req, res) => {
         console.error('Error subiendo clip:', error);
         res.status(500).json({ 
             success: false, 
-            error: 'Error interno del servidor' 
+            error: 'Error interno del servidor: ' + error.message
         });
     }
 });
@@ -400,42 +425,19 @@ app.get('/api/teams', (req, res) => {
     res.json(teams);
 });
 
-// Servir archivos de video con soporte de streaming
+// Servir archivos de video (redirigir a Cloudinary)
 app.get('/uploads/:filename', (req, res) => {
     const filename = req.params.filename;
-    const filepath = path.join(uploadsDir, filename);
     
-    if (!fs.existsSync(filepath)) {
+    // Buscar el clip por filename (public_id de Cloudinary)
+    const clip = clips.find(c => c.filename === filename || c.filename.includes(filename));
+    
+    if (!clip || !clip.video_url) {
         return res.status(404).json({ error: 'Archivo no encontrado' });
     }
     
-    const stat = fs.statSync(filepath);
-    const fileSize = stat.size;
-    const range = req.headers.range;
-    
-    // Configurar headers para video
-    res.setHeader('Accept-Ranges', 'bytes');
-    res.setHeader('Content-Type', 'video/mp4');
-    res.setHeader('Cache-Control', 'public, max-age=3600');
-    
-    if (range) {
-        // Soporte para streaming con rangos
-        const parts = range.replace(/bytes=/, "").split("-");
-        const start = parseInt(parts[0], 10);
-        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-        const chunksize = (end - start) + 1;
-        const file = fs.createReadStream(filepath, { start, end });
-        
-        res.status(206);
-        res.setHeader('Content-Range', `bytes ${start}-${end}/${fileSize}`);
-        res.setHeader('Content-Length', chunksize);
-        
-        file.pipe(res);
-    } else {
-        // Enviar archivo completo
-        res.setHeader('Content-Length', fileSize);
-        fs.createReadStream(filepath).pipe(res);
-    }
+    // Redirigir a la URL de Cloudinary
+    res.redirect(clip.video_url);
 });
 
 // WebSocket para tiempo real
