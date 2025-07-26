@@ -426,16 +426,44 @@ app.get('/api/teams', (req, res) => {
 });
 
 // Servir archivos de video (redirigir a Cloudinary)
-app.get('/uploads/:filename', (req, res) => {
-    const filename = req.params.filename;
+app.get('/uploads/*', (req, res) => {
+    const fullPath = req.params[0]; // Captura toda la ruta después de /uploads/
+    console.log('Buscando video con ruta completa:', fullPath);
+    console.log('Clips disponibles:', clips.map(c => ({ id: c.id, filename: c.filename, video_url: c.video_url })));
     
-    // Buscar el clip por filename (public_id de Cloudinary)
-    const clip = clips.find(c => c.filename === filename || c.filename.includes(filename));
+    // Buscar el clip por filename (puede ser el public_id completo o parte de él)
+    const clip = clips.find(c => {
+        if (!c.filename) return false;
+        
+        // Extraer el nombre del archivo sin la carpeta
+        const clipBaseName = c.filename.split('/').pop();
+        const searchBaseName = fullPath.split('/').pop();
+        
+        console.log('Comparando:', {
+            clipFilename: c.filename,
+            clipBaseName: clipBaseName,
+            fullPath: fullPath,
+            searchBaseName: searchBaseName
+        });
+        
+        // Buscar por diferentes combinaciones
+        return c.filename === fullPath || 
+               c.filename.includes(searchBaseName) || 
+               fullPath.includes(clipBaseName) ||
+               clipBaseName === searchBaseName;
+    });
     
-    if (!clip || !clip.video_url) {
+    if (!clip) {
+        console.log('Clip no encontrado para ruta:', fullPath);
         return res.status(404).json({ error: 'Archivo no encontrado' });
     }
     
+    if (!clip.video_url) {
+        console.log('Clip encontrado pero sin video_url:', clip);
+        return res.status(404).json({ error: 'URL de video no disponible' });
+    }
+    
+    console.log('Redirigiendo a:', clip.video_url);
     // Redirigir a la URL de Cloudinary
     res.redirect(clip.video_url);
 });
