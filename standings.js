@@ -1,32 +1,99 @@
-// Standings page functionality - FIXED VERSION
+// Standings page functionality - BACKEND CONNECTED VERSION
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 Inicializando página de posiciones...');
     
-    // Generar datos de ejemplo una sola vez
-    if (!fixturesData || fixturesData.length === 0) {
-        fixturesData = generateSampleFixtures();
-        console.log('📋 Datos de partidos generados una sola vez');
-    }
-    
     initializeStandings();
     setupEventListeners();
-    loadStandingsData();
+    loadAllData();
     createFloatingParticles();
+    setupWebSocket();
     
     console.log('✅ Página de posiciones inicializada');
 });
 
-// WebSocket connection disabled to prevent auto-refresh
+// WebSocket connection for real-time updates
 function setupWebSocket() {
-    console.log('WebSocket functionality is disabled to prevent auto-refresh');
-    // No se establece ninguna conexión WebSocket
+    console.log('🔌 Estableciendo conexión WebSocket...');
+    
+    const socket = io();
+    
+    socket.on('connect', () => {
+        console.log('✅ Conectado al servidor WebSocket');
+    });
+    
+    socket.on('standingsUpdate', (updatedStandings) => {
+        console.log('📊 Actualizando tabla de posiciones...');
+        standingsData = updatedStandings;
+        if (document.querySelector('#table.active')) {
+            loadStandingsTable();
+        }
+    });
+    
+    socket.on('matchesUpdate', (updatedMatches) => {
+        console.log('⚽ Actualizando partidos...');
+        fixturesData = updatedMatches;
+        if (document.querySelector('#fixtures.active')) {
+            loadFixtures();
+        }
+        if (document.querySelector('#results.active')) {
+            loadResults();
+        }
+        if (document.querySelector('#schedule.active')) {
+            loadSchedule();
+        }
+    });
+    
+    socket.on('teamsUpdate', (updatedTeams) => {
+        console.log('👥 Actualizando equipos...');
+        // Update teams data if needed
+    });
+    
+    socket.on('classificationZonesUpdate', (updatedZones) => {
+        console.log('🎨 Actualizando zonas de clasificación...');
+        classificationZones = updatedZones;
+        if (document.querySelector('#table.active')) {
+            loadStandingsTable();
+        }
+    });
+    
+    socket.on('bracketUpdate', (updatedBracket) => {
+        console.log('🏆 Actualizando bracket de playoffs vía WebSocket...');
+        console.log('📋 Datos del bracket recibido:', updatedBracket);
+        
+        // Forzar actualización si estamos en la pestaña de playoffs
+        if (document.querySelector('#playoffs.active')) {
+            console.log('🔄 Recargando bracket dinámico...');
+            renderDynamicBracket(updatedBracket);
+        }
+    });
+    
+    socket.on('disconnect', () => {
+        console.log('❌ Desconectado del servidor WebSocket');
+    });
 }
 
 // Global variables
 let currentMatchday = 1;
+let maxMatchdays = 3; // Se actualiza dinámicamente basado en los partidos
 let standingsData = [];
 let fixturesData = [];
 let resultsData = [];
+let classificationZones = [];
+let tournamentSettings = {};
+
+// Función para obtener el número máximo de jornadas dinámicamente
+function getMaxMatchdays() {
+    if (!fixturesData || fixturesData.length === 0) {
+        return 3; // Valor por defecto
+    }
+    
+    // Encontrar la jornada más alta en los datos
+    const maxMatchday = Math.max(...fixturesData.map(match => match.matchday || 1));
+    maxMatchdays = Math.max(maxMatchday, 1); // Asegurar que sea al menos 1
+    
+    console.log(`📊 Jornadas detectadas dinámicamente: ${maxMatchdays}`);
+    return maxMatchdays;
+}
 
 // Teams data with logos - Updated to match actual file names
 const teams = [
@@ -140,80 +207,147 @@ function switchTab(tabId) {
     }
 }
 
-async function loadStandingsData() {
-    console.log('Cargando datos de la tabla de posiciones...');
-    
-    // Verificar si ya se cargaron los datos
-    if (standingsData.length > 0 && fixturesData.length > 0) {
-        console.log('✅ Los datos ya están cargados, omitiendo recarga');
-        return;
-    }
+async function loadAllData() {
+    console.log('📊 Cargando todos los datos...');
     
     try {
-        // Intentar cargar datos del servidor
-        const [standingsRes, matchesRes] = await Promise.all([
-            fetch('/api/standings'),
-            fetch('/api/matches')
-        ]);
+        // Cargar configuración del torneo y zonas de clasificación
+        await loadTournamentSettings();
         
-        // Procesar datos de la tabla de posiciones
-        if (standingsRes && standingsRes.ok) {
-            const serverStandings = await standingsRes.json();
-            if (serverStandings && serverStandings.length > 0) {
-                standingsData = serverStandings;
-            }
-        }
+        // Cargar datos de clasificación
+        await loadStandingsData();
         
-        // Si no hay datos del servidor, usar datos de respaldo
-        if (standingsData.length === 0) {
-            console.log('Usando datos de respaldo para la tabla de posiciones');
-            standingsData = generateFallbackStandings();
-        }
+        // Cargar datos de partidos
+        await loadMatchesData();
         
-        // Procesar partidos
-        if (matchesRes && matchesRes.ok) {
-            const allMatches = await matchesRes.json();
-            
-            if (allMatches && allMatches.length > 0) {
-                // Filtrar partidos futuros y en vivo
-                fixturesData = allMatches
-                    .filter(match => match.status === 'upcoming' || match.status === 'live')
-                    .sort((a, b) => {
-                        const dateA = new Date(`${a.date}T${a.time || '00:00'}`);
-                        const dateB = new Date(`${b.date}T${b.time || '00:00'}`);
-                        return dateA - dateB;
-                    });
-                
-                // Filtrar partidos finalizados
-                resultsData = allMatches
-                    .filter(match => match.status === 'finished')
-                    .sort((a, b) => {
-                        const dateA = new Date(`${a.date}T${a.time || '00:00'}`);
-                        const dateB = new Date(`${b.date}T${b.time || '00:00'}`);
-                        return dateB - dateA;
-                    });
-            }
-        }
+        console.log('✅ Todos los datos cargados exitosamente');
         
-        // Si no hay partidos del servidor, no generamos datos de ejemplo
-        
-        // Actualizar la interfaz de usuario solo si hay datos
-        if (standingsData.length > 0) {
+        // Cargar la pestaña activa por defecto (tabla de posiciones)
+        if (document.querySelector('#table.active')) {
             loadStandingsTable();
         }
         
-        if (fixturesData.length > 0 || resultsData.length > 0) {
-            loadFixtures();
-            loadResults();
-            loadSchedule();
+    } catch (error) {
+        console.error('❌ Error cargando datos:', error);
+        
+        // Usar datos de respaldo
+        console.log('🔄 Usando datos de respaldo...');
+        standingsData = generateFallbackStandings();
+        fixturesData = generateSampleFixtures();
+        
+        // Usar zonas de clasificación por defecto
+        classificationZones = [
+            { id: 1, name: 'Clasificación Directa', positions: '1-4', color: '#00ff88' },
+            { id: 2, name: 'Repechaje', positions: '5-8', color: '#ffa500' },
+            { id: 3, name: 'Eliminación', positions: '9-12', color: '#ff4757' }
+        ];
+        
+        if (document.querySelector('#table.active')) {
+            loadStandingsTable();
         }
         
-        console.log('✅ Datos cargados correctamente');
+        showNotification('Conectando con el servidor...', 'info');
+    }
+}
+
+// Cargar configuración del torneo
+async function loadTournamentSettings() {
+    try {
+        const response = await fetch('/api/settings');
+        if (response.ok) {
+            tournamentSettings = await response.json();
+            
+            // Cargar zonas de clasificación
+            if (tournamentSettings.classificationZones && tournamentSettings.classificationZones.length > 0) {
+                classificationZones = tournamentSettings.classificationZones;
+                console.log('✅ Zonas de clasificación cargadas:', classificationZones.length);
+            } else {
+                // Usar zonas por defecto
+                classificationZones = [
+                    { id: 1, name: 'Clasificación Directa', positions: '1-4', color: '#00ff88' },
+                    { id: 2, name: 'Repechaje', positions: '5-8', color: '#ffa500' },
+                    { id: 3, name: 'Eliminación', positions: '9-12', color: '#ff4757' }
+                ];
+                console.log('📋 Usando zonas de clasificación por defecto');
+            }
+        }
+    } catch (error) {
+        console.error('Error loading tournament settings:', error);
+        // Usar configuración por defecto
+        classificationZones = [
+            { id: 1, name: 'Clasificación Directa', positions: '1-4', color: '#00ff88' },
+            { id: 2, name: 'Repechaje', positions: '5-8', color: '#ffa500' },
+            { id: 3, name: 'Eliminación', positions: '9-12', color: '#ff4757' }
+        ];
+    }
+}
+
+async function loadStandingsData() {
+    try {
+        const response = await fetch('/api/standings');
+        if (!response.ok) {
+            throw new Error('Error en la respuesta del servidor');
+        }
+        
+        const data = await response.json();
+        console.log('✅ Datos de posiciones cargados desde el servidor:', data);
+        standingsData = data;
         
     } catch (error) {
-        console.error('❌ Error al cargar los datos:', error);
-        // No generamos datos de ejemplo automáticamente
-        showNotification('Error al cargar los datos. Intenta recargar la página.', 'error');
+        console.error('❌ Error cargando datos del servidor:', error);
+        console.log('🔄 Usando datos de respaldo...');
+        
+        // Usar datos de respaldo si el servidor no está disponible
+        standingsData = generateFallbackStandings();
+        showNotification('Usando datos de ejemplo - Servidor no disponible', 'info');
+    }
+}
+
+async function loadMatchesData() {
+    try {
+        const response = await fetch('/api/tournament/matches');
+        if (!response.ok) {
+            throw new Error('Error en la respuesta del servidor');
+        }
+        
+        const data = await response.json();
+        console.log('✅ Datos de partidos cargados desde el servidor:', data);
+        
+        if (data && data.length > 0) {
+            // Separar partidos por estado: programados vs terminados
+            fixturesData = data.filter(match => match.status === 'scheduled' || match.status === 'live');
+            resultsData = data.filter(match => match.status === 'finished');
+            
+            console.log(`📊 Partidos programados: ${fixturesData.length}`);
+            console.log(`📊 Partidos terminados: ${resultsData.length}`);
+            
+            // Para la pestaña de partidos, mostrar TODOS los partidos independientemente del estado
+            // Esto permite ver tanto partidos programados como terminados en la misma jornada
+            const allMatchesData = data;
+            
+            // Asignar todos los partidos a fixturesData para que aparezcan en la pestaña de partidos
+            fixturesData = allMatchesData;
+            
+        } else {
+            // Si no hay partidos en el servidor, usar datos de ejemplo
+            const sampleData = generateSampleFixtures();
+            fixturesData = sampleData;
+            resultsData = [];
+            console.log('📋 Usando datos de partidos de ejemplo');
+        }
+        
+        // Actualizar jornadas máximas dinámicamente
+        getMaxMatchdays();
+        
+    } catch (error) {
+        console.error('❌ Error cargando partidos del servidor:', error);
+        console.log('🔄 Generando datos de partidos de ejemplo...');
+        const sampleData = generateSampleFixtures();
+        fixturesData = sampleData;
+        resultsData = [];
+        
+        // Actualizar jornadas máximas dinámicamente
+        getMaxMatchdays();
     }
 }
 
@@ -342,6 +476,9 @@ function loadStandingsTable() {
         standingsData = generateFallbackStandings();
     }
     
+    // Aplicar estilos dinámicos para las zonas de clasificación
+    applyDynamicZoneStyles();
+    
     // Ordenar los datos por posición
     const sortedStandings = [...standingsData].sort((a, b) => a.position - b.position);
     
@@ -384,6 +521,64 @@ function loadStandingsTable() {
     console.log('✅ Tabla de posiciones cargada con', standingsData.length, 'equipos');
 }
 
+// Aplicar estilos dinámicos para las zonas de clasificación
+function applyDynamicZoneStyles() {
+    // Remover estilos existentes
+    const existingStyle = document.getElementById('dynamic-zone-styles');
+    if (existingStyle) {
+        existingStyle.remove();
+    }
+    
+    // Crear nuevos estilos basados en las zonas de clasificación
+    const style = document.createElement('style');
+    style.id = 'dynamic-zone-styles';
+    
+    let css = '';
+    classificationZones.forEach(zone => {
+        css += `
+            .zone-${zone.id} {
+                border-left: 4px solid ${zone.color} !important;
+                background: linear-gradient(90deg, ${zone.color}15, transparent) !important;
+            }
+            .zone-${zone.id}:hover {
+                background: linear-gradient(90deg, ${zone.color}25, transparent) !important;
+            }
+        `;
+    });
+    
+    style.textContent = css;
+    document.head.appendChild(style);
+    
+    console.log('🎨 Estilos dinámicos aplicados para', classificationZones.length, 'zonas');
+    
+    // También actualizar la leyenda
+    updateTableLegend();
+}
+
+// Actualizar la leyenda de colores debajo de la tabla
+function updateTableLegend() {
+    const legendContainer = document.querySelector('.table-legend');
+    if (!legendContainer) return;
+    
+    // Limpiar leyenda existente
+    legendContainer.innerHTML = '';
+    
+    // Crear elementos de leyenda basados en las zonas de clasificación
+    classificationZones.forEach(zone => {
+        const legendItem = document.createElement('div');
+        legendItem.className = 'legend-item';
+        
+        legendItem.innerHTML = `
+            <span class="legend-color" style="background-color: ${zone.color}; border: 2px solid ${zone.color};"></span>
+            <span>${zone.name} (${zone.positions})</span>
+        `;
+        
+        legendContainer.appendChild(legendItem);
+    });
+    
+    console.log('📋 Leyenda de tabla actualizada con', classificationZones.length, 'zonas');
+}
+
 // Show notification to user
 function showNotification(message, type = 'info') {
     // Create notification element if it doesn't exist
@@ -418,6 +613,9 @@ function loadFixtures() {
         return;
     }
     
+    // Actualizar número máximo de jornadas dinámicamente
+    const maxJornadas = getMaxMatchdays();
+    
     // Get current matchday fixtures (up to 6 matches)
     const matchdayFixtures = fixturesData
         .filter(match => match.matchday === currentMatchday)
@@ -432,31 +630,20 @@ function loadFixtures() {
             
             <div class="matchday-info">
                 <h3>Jornada ${currentMatchday}</h3>
-                <span>${matchdayFixtures.length} partidos</span>
+                <span>${matchdayFixtures.length} partidos | ${currentMatchday}/${maxJornadas}</span>
             </div>
             
-            <button class="nav-arrow" onclick="changeMatchday('next', 'fixtures')" ${currentMatchday === 3 ? 'disabled' : ''}>
+            <button class="nav-arrow" onclick="changeMatchday('next', 'fixtures')" ${currentMatchday >= maxJornadas ? 'disabled' : ''}>
                 <i class="fas fa-chevron-right"></i>
             </button>
         </div>
-        
-        <div class="fixtures-grid" id="fixturesGrid"></div>
-        
-        <div class="matchday-pagination">
-            ${[1, 2, 3].map(day => `
-                <button class="matchday-dot ${day === currentMatchday ? 'active' : ''}" 
-                        onclick="currentMatchday = ${day}; loadFixtures();">
-                    <span class="sr-only">Jornada ${day}</span>
-                </button>
-            `).join('')}
-        </div>
     `;
     
-    // Update container with navigation and grid
+    // Update fixtures container with navigation
     fixturesContainer.innerHTML = navigationHTML;
     
-    // Get the grid where matches will be displayed
     const fixturesGrid = document.getElementById('fixturesGrid');
+    if (!fixturesGrid) return;
     
     if (matchdayFixtures.length === 0) {
         fixturesGrid.innerHTML = `
@@ -485,10 +672,37 @@ function loadFixtures() {
 
 // Load results tab
 function loadResults() {
+    const resultsContainer = document.getElementById('resultsContainer');
     const resultsGrid = document.getElementById('resultsGrid');
     if (!resultsGrid) return;
     
+    // Actualizar número máximo de jornadas dinámicamente
+    const maxJornadas = getMaxMatchdays();
+    
     const matchdayResults = resultsData.filter(match => match.matchday === currentMatchday);
+    
+    // Create matchday navigation controls for results
+    if (resultsContainer) {
+        const navigationHTML = `
+            <div class="matchday-navigation">
+                <button class="nav-arrow" onclick="changeMatchday('prev', 'results')" ${currentMatchday === 1 ? 'disabled' : ''}>
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                
+                <div class="matchday-info">
+                    <h3>Jornada ${currentMatchday}</h3>
+                    <span>${matchdayResults.length} resultados | ${currentMatchday}/${maxJornadas}</span>
+                </div>
+                
+                <button class="nav-arrow" onclick="changeMatchday('next', 'results')" ${currentMatchday >= maxJornadas ? 'disabled' : ''}>
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+        `;
+        
+        // Update results container with navigation
+        resultsContainer.innerHTML = navigationHTML;
+    }
     
     if (matchdayResults.length === 0) {
         resultsGrid.innerHTML = `
@@ -502,7 +716,7 @@ function loadResults() {
     
     resultsGrid.innerHTML = matchdayResults.map(match => createResultCard(match)).join('');
     
-    // Update matchday display
+    // Update matchday display (fallback for legacy elements)
     const matchdaySpan = document.getElementById('resultsMatchday');
     if (matchdaySpan) {
         matchdaySpan.textContent = `Jornada ${currentMatchday}`;
@@ -514,8 +728,12 @@ function loadSchedule() {
     const scheduleTimeline = document.getElementById('scheduleTimeline');
     if (!scheduleTimeline) return;
     
-    const allMatches = [...fixturesData, ...resultsData];
+    // Usar solo fixturesData ya que ahora contiene todos los partidos (scheduled y finished)
+    // Esto evita duplicados que ocurrían al combinar fixturesData y resultsData
+    const allMatches = fixturesData || [];
     const matchdayGroups = {};
+    
+    console.log('📅 Cargando calendario con', allMatches.length, 'partidos');
     
     allMatches.forEach(match => {
         if (!matchdayGroups[match.matchday]) {
@@ -662,27 +880,48 @@ function createMatchdayElement(matchday, matches) {
 }
 
 function getPositionClass(position) {
-    if (position === 1) return 'champion';
-    if (position <= 8) return 'playoffs';
-    if (position >= 9) return 'relegation';
+    // Buscar en qué zona de clasificación está esta posición
+    for (const zone of classificationZones) {
+        if (isPositionInZone(position, zone.positions)) {
+            return `zone-${zone.id}`;
+        }
+    }
     return '';
+}
+
+// Función auxiliar para verificar si una posición está en un rango
+function isPositionInZone(position, positionsRange) {
+    if (!positionsRange) return false;
+    
+    // Manejar rangos como "1-4" o posiciones individuales como "1"
+    if (positionsRange.includes('-')) {
+        const [start, end] = positionsRange.split('-').map(num => parseInt(num.trim()));
+        return position >= start && position <= end;
+    } else {
+        return position === parseInt(positionsRange.trim());
+    }
 }
 
 /**
  * Cambia la jornada actual y recarga el contenido correspondiente
- * @param {string|number} direction - Dirección del cambio ('prev', 'next') o número de jornada (1-3)
+ * @param {string|number} direction - Dirección del cambio ('prev', 'next') o número de jornada
  * @param {string} type - Tipo de contenido a actualizar ('fixtures' o 'results')
  */
 function changeMatchday(direction, type) {
+    // Obtener el número máximo de jornadas dinámicamente
+    const maxJornadas = getMaxMatchdays();
+    
     // Actualizar el número de jornada según la dirección
     if (direction === 'prev' && currentMatchday > 1) {
         currentMatchday--;
-    } else if (direction === 'next' && currentMatchday < 3) {
+    } else if (direction === 'next' && currentMatchday < maxJornadas) {
         currentMatchday++;
-    } else if (typeof direction === 'number' && direction >= 1 && direction <= 3) {
+    } else if (typeof direction === 'number' && direction >= 1 && direction <= maxJornadas) {
         // Si se pasa un número de jornada directamente
         currentMatchday = direction;
     }
+    
+    console.log(`🔄 Cambiando a jornada ${currentMatchday} de ${maxJornadas} jornadas disponibles`);
     
     // Recargar el contenido correspondiente
     if (type === 'fixtures') {
@@ -774,19 +1013,430 @@ function updateScheduleStats(matches) {
 }
 
 // Load playoffs tab
-function loadPlayoffs() {
+async function loadPlayoffs() {
     console.log('🏆 Loading playoffs bracket...');
     
-    // For now, just show the placeholder structure
-    // Later, this will be populated with actual qualified teams
-    const quarterfinalsMatches = document.getElementById('quarterfinalsMatches');
-    if (quarterfinalsMatches) {
-        // The HTML structure is already in place, no dynamic loading needed yet
-        console.log('✅ Playoffs bracket loaded (placeholder mode)');
+    try {
+        // Cargar bracket actual desde el backend
+        const response = await fetch('/api/playoffs/bracket');
+        if (response.ok) {
+            const bracket = await response.json();
+            console.log('📋 Bracket data received:', bracket);
+            
+            if (bracket && bracket.teams && bracket.matches) {
+                console.log('✅ Rendering bracket with', bracket.matches.length, 'matches');
+                renderDynamicBracket(bracket);
+                console.log('✅ Bracket dinámico cargado:', bracket.format);
+            } else {
+                console.log('❌ No bracket data available');
+                showEmptyBracketMessage();
+            }
+        } else {
+            console.log('❌ Failed to fetch bracket, status:', response.status);
+            showEmptyBracketMessage();
+        }
+    } catch (error) {
+        console.error('Error loading bracket:', error);
+        showEmptyBracketMessage();
+    }
+}
+
+// Mostrar mensaje cuando no hay bracket generado
+function showEmptyBracketMessage() {
+    const playoffsContainer = document.querySelector('#playoffs .playoffs-bracket-visual');
+    if (playoffsContainer) {
+        playoffsContainer.innerHTML = `
+            <div class="empty-bracket-message">
+                <i class="fas fa-trophy" style="font-size: 3rem; color: #00ff88; margin-bottom: 1rem;"></i>
+                <h3>No hay bracket de playoffs generado</h3>
+                <p>El administrador aún no ha generado el bracket de playoffs.</p>
+                <p>Una vez que se genere, aparecerá aquí automáticamente.</p>
+            </div>
+        `;
+    }
+    console.log('📋 Mostrando mensaje de bracket vacío');
+}
+
+// Renderizar bracket dinámico
+function renderDynamicBracket(bracket) {
+    const playoffsContainer = document.querySelector('#playoffs .playoffs-bracket-visual');
+    if (!playoffsContainer) return;
+    
+    // Limpiar contenido existente
+    playoffsContainer.innerHTML = '';
+    
+    // Crear estructura del bracket basada en el formato
+    const { format, teams, matches } = bracket;
+    
+    // Crear título del bracket más compacto
+    const bracketTitle = document.createElement('div');
+    bracketTitle.className = 'bracket-title-compact';
+    bracketTitle.innerHTML = `
+        <h3><i class="fas fa-trophy"></i> Playoffs ${getFormatName(format)} - ${teams.length} equipos</h3>
+    `;
+    playoffsContainer.appendChild(bracketTitle);
+    
+    // Renderizar rondas del bracket
+    renderBracketRounds(bracket, playoffsContainer);
+    
+    // Agregar estilos dinámicos para el bracket
+    addBracketStyles();
+    
+    console.log('✅ Bracket dinámico renderizado:', format, 'equipos:', teams.length);
+}
+
+// Obtener nombre del formato
+function getFormatName(format) {
+    const formatNames = {
+        '4': 'Semifinales',
+        '8': 'Cuartos de Final', 
+        '16': 'Octavos de Final'
+    };
+    return formatNames[format] || `${format} Equipos`;
+}
+
+// Renderizar rondas del bracket
+function renderBracketRounds(bracket, container) {
+    const { format, teams, matches } = bracket;
+    
+    // Crear contenedor de rondas más compacto
+    const roundsContainer = document.createElement('div');
+    roundsContainer.className = 'bracket-rounds-container';
+    roundsContainer.style.cssText = `
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        gap: 15px;
+        padding: 10px;
+        overflow-x: auto;
+        min-height: 300px;
+        max-width: 100%;
+    `;
+    
+    // Organizar partidos por ronda
+    const matchesByRound = {};
+    matches.forEach(match => {
+        if (!matchesByRound[match.round]) {
+            matchesByRound[match.round] = [];
+        }
+        matchesByRound[match.round].push(match);
+    });
+    
+    // Renderizar cada ronda
+    Object.keys(matchesByRound).sort((a, b) => parseInt(a) - parseInt(b)).forEach(round => {
+        const roundDiv = document.createElement('div');
+        roundDiv.className = 'bracket-round';
+        roundDiv.style.cssText = `
+            flex: 0 0 auto;
+            min-width: 180px;
+            max-width: 200px;
+        `;
+        
+        const roundTitle = document.createElement('h4');
+        roundTitle.className = 'round-title-compact';
+        roundTitle.style.cssText = `
+            color: #00ff88;
+            text-align: center;
+            margin-bottom: 10px;
+            padding: 5px 8px;
+            background: rgba(0, 255, 136, 0.1);
+            border: 1px solid #00ff88;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: bold;
+        `;
+        
+        // Usar el nombre de la ronda del primer partido si está disponible
+        const firstMatch = matchesByRound[round][0];
+        const roundName = firstMatch.roundName || getRoundName(round, format);
+        roundTitle.textContent = roundName;
+        roundDiv.appendChild(roundTitle);
+        
+        const matchesContainer = document.createElement('div');
+        matchesContainer.className = 'round-matches';
+        matchesContainer.style.cssText = `
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        `;
+        
+        matchesByRound[round].forEach(match => {
+            const matchDiv = createBracketMatch(match);
+            matchesContainer.appendChild(matchDiv);
+        });
+        
+        roundDiv.appendChild(matchesContainer);
+        roundsContainer.appendChild(roundDiv);
+    });
+    
+    container.appendChild(roundsContainer);
+}
+
+// Obtener nombre de la ronda
+function getRoundName(round, format) {
+    const roundNames = {
+        '1': {
+            '16': 'Octavos de Final',
+            '8': 'Cuartos de Final',
+            '4': 'Semifinales'
+        },
+        '2': {
+            '16': 'Cuartos de Final',
+            '8': 'Semifinales',
+            '4': 'Final'
+        },
+        '3': {
+            '16': 'Semifinales',
+            '8': 'Final'
+        },
+        '4': {
+            '16': 'Final'
+        }
+    };
+    
+    return roundNames[round]?.[format] || `Ronda ${round}`;
+}
+
+// Crear elemento de partido del bracket
+function createBracketMatch(match) {
+    const matchDiv = document.createElement('div');
+    matchDiv.className = 'bracket-match-container';
+    
+    const isFinished = match.homeScore !== null && match.awayScore !== null && match.homeScore !== undefined && match.awayScore !== undefined;
+    const homeWinner = isFinished && parseInt(match.homeScore) > parseInt(match.awayScore);
+    const awayWinner = isFinished && parseInt(match.awayScore) > parseInt(match.homeScore);
+    const isDraw = isFinished && parseInt(match.homeScore) === parseInt(match.awayScore);
+    
+    // Determinar ganador (en caso de empate, se puede definir por penales o criterio específico)
+    let winner = null;
+    if (homeWinner) winner = match.homeTeam;
+    else if (awayWinner) winner = match.awayTeam;
+    
+    console.log('🎮 Renderizando partido:', match.homeTeam, 'vs', match.awayTeam, 'Finalizado:', isFinished, 'Scores:', match.homeScore, match.awayScore);
+    
+    matchDiv.innerHTML = `
+        <div class="bracket-match-compact ${isFinished ? 'finished' : 'pending'}" data-match-id="${match.id}">
+            <div class="match-teams">
+                <div class="team-row ${homeWinner ? 'winner' : ''}">
+                    <span class="team-name">${truncateTeamName(match.homeTeam)}</span>
+                    <span class="team-score">${isFinished ? match.homeScore : '-'}</span>
+                </div>
+                <div class="team-row ${awayWinner ? 'winner' : ''}">
+                    <span class="team-name">${truncateTeamName(match.awayTeam)}</span>
+                    <span class="team-score">${isFinished ? match.awayScore : '-'}</span>
+                </div>
+            </div>
+            ${!isFinished ? '<div class="vs-indicator">VS</div>' : ''}
+            ${isFinished && winner ? `<div class="match-winner">🏆 ${truncateTeamName(winner)}</div>` : ''}
+        </div>
+    `;
+    
+    return matchDiv;
+}
+
+// Función auxiliar para truncar nombres de equipos largos
+function truncateTeamName(teamName) {
+    if (!teamName) return 'TBD';
+    if (teamName.length <= 12) return teamName;
+    return teamName.substring(0, 10) + '...';
+}
+
+// Agregar estilos dinámicos para el bracket
+function addBracketStyles() {
+    // Remover estilos existentes
+    const existingStyle = document.getElementById('dynamic-bracket-styles');
+    if (existingStyle) {
+        existingStyle.remove();
     }
     
-    // TODO: When teams are available, update the team slots with actual team names
-    // This function will be expanded when you add the teams later
+    // Crear nuevos estilos para el bracket
+    const style = document.createElement('style');
+    style.id = 'bracket-dynamic-styles';
+    style.textContent = `
+        .bracket-title-compact {
+            text-align: center;
+            margin-bottom: 15px;
+            padding: 10px 15px;
+            background: linear-gradient(135deg, rgba(0, 255, 136, 0.15), rgba(0, 255, 136, 0.05));
+            border-radius: 10px;
+            border: 1px solid rgba(0, 255, 136, 0.3);
+        }
+        
+        .bracket-title-compact h3 {
+            color: #00ff88;
+            margin: 0;
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+        
+        .bracket-rounds-container {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            gap: 15px;
+            padding: 10px;
+            overflow-x: auto;
+            max-width: 100%;
+        }
+        
+        .bracket-round {
+            flex: 0 0 auto;
+            min-width: 180px;
+            max-width: 200px;
+        }
+        
+        .round-title-compact {
+            color: #00ff88;
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-align: center;
+            padding: 5px 8px;
+            background: rgba(0, 255, 136, 0.1);
+            border-radius: 15px;
+            border: 1px solid rgba(0, 255, 136, 0.3);
+        }
+        
+        .round-matches {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .bracket-match-container {
+            margin-bottom: 5px;
+        }
+        
+        .bracket-match-compact {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(0, 255, 136, 0.4);
+            border-radius: 6px;
+            overflow: hidden;
+            min-width: 160px;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        
+        .bracket-match-compact:hover {
+            border-color: rgba(0, 255, 136, 0.7);
+            box-shadow: 0 2px 8px rgba(0, 255, 136, 0.2);
+        }
+        
+        .bracket-match-compact.finished {
+            border-color: rgba(0, 255, 136, 0.6);
+            background: rgba(0, 255, 136, 0.05);
+        }
+        
+        .bracket-match-compact.pending {
+            border-color: rgba(255, 165, 0, 0.5);
+            background: rgba(255, 165, 0, 0.03);
+        }
+        
+        .match-teams {
+            padding: 6px;
+        }
+        
+        .team-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 6px;
+            margin-bottom: 2px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.05);
+            transition: all 0.2s ease;
+        }
+        
+        .team-row:last-child {
+            margin-bottom: 0;
+        }
+        
+        .team-row.winner {
+            background: rgba(0, 255, 136, 0.2);
+            color: #00ff88;
+            font-weight: bold;
+            border: 1px solid rgba(0, 255, 136, 0.5);
+        }
+        
+        .team-name {
+            font-size: 11px;
+            font-weight: 500;
+            color: white;
+            flex: 1;
+            text-align: left;
+        }
+        
+        .team-row.winner .team-name {
+            color: #00ff88;
+            font-weight: bold;
+        }
+        
+        .team-score {
+            font-weight: bold;
+            font-size: 12px;
+            color: #00ff88;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 2px 6px;
+            border-radius: 3px;
+            min-width: 20px;
+            text-align: center;
+            margin-left: 5px;
+        }
+        
+        .vs-indicator {
+            text-align: center;
+            padding: 3px;
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.7);
+            font-weight: bold;
+        }
+        
+        .match-winner {
+            text-align: center;
+            padding: 3px 6px;
+            font-size: 10px;
+            color: #00ff88;
+            font-weight: bold;
+            background: rgba(0, 255, 136, 0.1);
+            border-top: 1px solid rgba(0, 255, 136, 0.3);
+        }
+        
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .bracket-rounds-container {
+                flex-direction: column;
+                align-items: center;
+                gap: 10px;
+            }
+            
+            .bracket-round {
+                width: 100%;
+                max-width: 250px;
+                min-width: 200px;
+            }
+            
+            .bracket-match-compact {
+                min-width: 180px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .bracket-title-compact h3 {
+                font-size: 1rem;
+            }
+            
+            .team-name {
+                font-size: 10px;
+            }
+            
+            .team-score {
+                font-size: 11px;
+                padding: 1px 4px;
+            }
+        }
+    `;
+    
+    document.head.appendChild(style);
 }
 
 // Función para cargar los datos de la tabla de posiciones

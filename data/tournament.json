@@ -1,0 +1,341 @@
+{
+  "teams": [
+    {
+      "id": 1,
+      "name": "ACP 507",
+      "founded": 2020,
+      "stadium": "Estadio ACP"
+    },
+    {
+      "id": 2,
+      "name": "BKS FC",
+      "founded": 2023,
+      "stadium": "BKS Stadium"
+    },
+    {
+      "id": 3,
+      "name": "Coiner FC",
+      "founded": 2019,
+      "stadium": "Campo Coiner"
+    },
+    {
+      "id": 4,
+      "name": "FC WEST SIDE",
+      "founded": 2021,
+      "stadium": "West Side Arena"
+    },
+    {
+      "id": 5,
+      "name": "Humacao FC",
+      "founded": 2020,
+      "stadium": "Estadio Humacao"
+    },
+    {
+      "id": 6,
+      "name": "Jumpers FC",
+      "founded": 2022,
+      "stadium": "Jumpers Arena"
+    },
+    {
+      "id": 7,
+      "name": "LOS PLEBES Tk",
+      "founded": 2021,
+      "stadium": "Estadio Los Plebes"
+    },
+    {
+      "id": 8,
+      "name": "Punta Coco FC",
+      "founded": 2018,
+      "stadium": "Punta Coco Field"
+    },
+    {
+      "id": 9,
+      "name": "Pura Vibra",
+      "founded": 2022,
+      "stadium": "Vibra Stadium"
+    },
+    {
+      "id": 10,
+      "name": "Rayos X FC",
+      "founded": 2020,
+      "stadium": "Rayos Stadium"
+    },
+    {
+      "id": 11,
+      "name": "Tiki Taka FC",
+      "founded": 2021,
+      "stadium": "Tiki Taka Field"
+    },
+    {
+      "id": 12,
+      "name": "WEST SIDE PTY",
+      "founded": 2023,
+      "stadium": "West Side Stadium"
+    }
+  ],
+  "matches": [
+    {
+      "id": 1753723981205,
+      "homeTeam": "Tiki Taka FC",
+      "awayTeam": "BKS FC",
+      "date": "2222-02-22",
+      "time": "22:22",
+      "matchday": 1,
+      "status": "finished",
+      "homeScore": 2,
+      "awayScore": 3
+    }
+  ],
+  "standings": [
+    {
+      "team": "BKS FC",
+      "played": 1,
+      "won": 1,
+      "drawn": 0,
+      "lost": 0,
+      "goalsFor": 3,
+      "goalsAgainst": 2,
+      "goalDifference": 1,
+      "points": 3,
+      "position": 1
+    },
+    {
+      "team": "ACP 507",
+      "played": 0,
+      "won": 0,
+      "drawn": 0,
+      "lost": 0,
+      "goalsFor": 0,
+      "goalsAgainst": 0,
+      "goalDifference": 0,
+      "points": 0,
+      "position": 2
+    },
+    {
+      "team": "Coiner FC",
+      "played": 0,
+      "won": 0,
+      "drawn": 0,
+      "lost": 0,
+      "goalsFor": 0,
+      "goalsAgainst": 0,
+      "goalDifference": 0,
+      "points": 0,
+      "position": 3
+    },
+    {
+      "team": "FC WEST SIDE",
+      "played": 0,
+      "won": 0,
+      "drawn": 0,
+      "lost": 0,
+      "goalsFor": 0,
+      "goalsAgainst": 0,
+      "goalDifference": 0,
+      "points": 0,
+      "position": 4
+    },
+    {
+      "team": "Humacao FC",
+      "played": 0,
+      "won": 0,
+      "drawn": 0,
+      "lost": 0,
+      "goalsFor": 0,
+      "goalsAgainst": 0,
+      "goalDifference": 0,
+      "points": 0,
+      "position": 5
+    },
+    {
+      "team": "Jumpers FC",
+      "played": 0,
+      "won": 0,
+      "drawn": 0,
+      "lost": 0,
+      "goalsFor": 0,
+      "goalsAgainst": 0,
+      "goalDifference": 0,
+      "points": 0,
+      "position": 6
+    },
+    {
+      "team": "LOS PLEBES Tk",
+      "played": 0,
+      "won": 0,
+      "drawn": 0,
+      "lost": 0,
+      "goalsFor": 0,
+      "goalsAgainst": 0,
+      "goalDifference": 0,
+      "points": 0,
+      "position": 7
+    },
+    {
+      "team": "Punta Coco FC",
+      "played": 0,
+      "won": 0,
+      "drawn": 0,
+      "lost": 0,
+      "goalsFor": 0,
+      "goalsAgainst": 0,
+      "goalDifference": 0,
+      "points": 0,
+      "position": 8
+    },
+    {
+      "team": "Pura Vibra",
+      "played": 0,
+      "won": 0,
+      "drawn": 0,
+      "lost": 0,
+      "goalsFor": 0,
+      "goalsAgainst": 0,
+      "goalDifference": 0,
+      "points": 0,
+      "position": 9
+    },
+    {
+      "team": "Rayos X FC",
+      "played": 0,
+      "won": 0,
+      "drawn": 0,
+      "lost": 0,
+      "goalsFor": 0,
+      "goalsAgainst": 0,
+      "goalDifference": 0,
+      "points": 0,
+      "position": 10
+    },
+    {
+      "team": "WEST SIDE PTY",
+      "played": 0,
+      "won": 0,
+      "drawn": 0,
+      "lost": 0,
+      "goalsFor": 0,
+      "goalsAgainst": 0,
+      "goalDifference": 0,
+      "points": 0,
+      "position": 11
+    },
+    {
+      "team": "Tiki Taka FC",
+      "played": 1,
+      "won": 0,
+      "drawn": 0,
+      "lost": 1,
+      "goalsFor": 2,
+      "goalsAgainst": 3,
+      "goalDifference": -1,
+      "points": 0,
+      "position": 12
+    }
+  ],
+  "settings": {
+    "seasonName": "Temporada 2025",
+    "pointsWin": 3,
+    "pointsDraw": 1,
+    "pointsLoss": 0,
+    "classificationZones": [
+      {
+        "id": 1,
+        "name": "Clasificación Directa",
+        "positions": "1-8",
+        "color": "#00ff88"
+      },
+      {
+        "id": 3,
+        "name": "Eliminación directa",
+        "positions": "9-12",
+        "color": "#ff4757"
+      }
+    ]
+  },
+  "currentBracket": {
+    "format": "8",
+    "teams": [
+      "Jumpers FC",
+      "Coiner FC",
+      "WEST SIDE PTY",
+      "ACP 507",
+      "BKS FC",
+      "FC WEST SIDE",
+      "LOS PLEBES Tk",
+      "Punta Coco FC"
+    ],
+    "matches": [
+      {
+        "id": "match_1",
+        "round": 1,
+        "roundName": "Cuartos de Final",
+        "homeTeam": "Jumpers FC",
+        "awayTeam": "Punta Coco FC",
+        "homeScore": 4,
+        "awayScore": 2,
+        "status": "finished"
+      },
+      {
+        "id": "match_2",
+        "round": 1,
+        "roundName": "Cuartos de Final",
+        "homeTeam": "Coiner FC",
+        "awayTeam": "LOS PLEBES Tk",
+        "homeScore": 3,
+        "awayScore": 4,
+        "status": "finished"
+      },
+      {
+        "id": "match_3",
+        "round": 1,
+        "roundName": "Cuartos de Final",
+        "homeTeam": "WEST SIDE PTY",
+        "awayTeam": "FC WEST SIDE",
+        "homeScore": 2,
+        "awayScore": 1,
+        "status": "finished"
+      },
+      {
+        "id": "match_4",
+        "round": 1,
+        "roundName": "Cuartos de Final",
+        "homeTeam": "ACP 507",
+        "awayTeam": "BKS FC",
+        "homeScore": 3,
+        "awayScore": 2,
+        "status": "finished"
+      },
+      {
+        "id": "match_5",
+        "round": 2,
+        "roundName": "Semifinales",
+        "homeTeam": "Jumpers FC",
+        "awayTeam": "LOS PLEBES Tk",
+        "homeScore": 3,
+        "awayScore": 2,
+        "status": "finished"
+      },
+      {
+        "id": "match_6",
+        "round": 2,
+        "roundName": "Semifinales",
+        "homeTeam": "WEST SIDE PTY",
+        "awayTeam": "ACP 507",
+        "homeScore": 2,
+        "awayScore": 1,
+        "status": "finished"
+      },
+      {
+        "id": "match_7",
+        "round": 3,
+        "roundName": "Final",
+        "homeTeam": "Jumpers FC",
+        "awayTeam": "WEST SIDE PTY",
+        "homeScore": 1,
+        "awayScore": 0,
+        "status": "finished"
+      }
+    ],
+    "createdAt": "2025-07-28T16:20:46.746Z"
+  }
+}

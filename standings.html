@@ -148,29 +148,29 @@
                         <p>Cargando partidos...</p>
                     </div>
                 </div>
+                
+                <div class="fixtures-grid" id="fixturesGrid">
+                    <!-- Partidos se cargan aquí dinámicamente -->
+                </div>
             </div>
 
             <!-- Results Tab -->
             <div class="tab-content" id="results">
-                <div class="results-container">
+                <div class="results-container" id="resultsContainer">
                     <h2 class="section-title">
                         <i class="fas fa-history"></i>
                         Resultados Recientes
                     </h2>
                     
-                    <div class="matchday-selector">
-                        <button class="matchday-btn" id="prevResultsMatchday">
-                            <i class="fas fa-chevron-left"></i>
-                        </button>
-                        <span class="matchday-title" id="resultsMatchday">Jornada 1</span>
-                        <button class="matchday-btn" id="nextResultsMatchday">
-                            <i class="fas fa-chevron-right"></i>
-                        </button>
+                    <!-- La navegación se genera dinámicamente por JavaScript -->
+                    <div class="loading-results">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <p>Cargando resultados...</p>
                     </div>
-
-                    <div class="results-grid" id="resultsGrid">
-                        <!-- Results will be loaded here dynamically -->
-                    </div>
+                </div>
+                
+                <div class="results-grid" id="resultsGrid">
+                    <!-- Results will be loaded here dynamically -->
                 </div>
             </div>
 
@@ -197,6 +197,12 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
+                    
+                    <div style="margin-bottom: 20px; text-align: center;">
+                        <button onclick="loadPlayoffs()" style="background: #00ff88; color: black; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold;">
+                            🔄 Recargar Bracket
+                        </button>
                     </div>
                     
                     <div class="playoffs-bracket-visual">
