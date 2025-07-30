@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeAdmin();
     setupEventListeners();
     loadInitialData();
+    initializeWebSocket(); // Inicializar WebSocket para sincronización
     
     console.log('✅ Panel de administración inicializado');
 });
@@ -12,7 +13,44 @@ document.addEventListener('DOMContentLoaded', function() {
 // Global variables
 let teams = [];
 let matches = [];
+let players = [];
 let currentTab = 'teams';
+let editingPlayerId = null;
+let socket = null;
+
+// Inicializar WebSocket
+function initializeWebSocket() {
+    if (typeof io !== 'undefined') {
+        socket = io();
+        
+        socket.on('connect', () => {
+            console.log('✅ Admin conectado al servidor WebSocket');
+        });
+        
+        // Handler para actualizaciones de clubes
+        socket.on('clubsUpdate', (updatedClubs) => {
+            console.log('🏢 Actualización de clubes recibida:', updatedClubs.length);
+            clubs = updatedClubs;
+            if (currentTab === 'clubs') {
+                renderClubs();
+            }
+        });
+        
+        // Handler para actualizaciones de equipos
+        socket.on('teamsUpdate', (updatedTeams) => {
+            console.log('🏆 Actualización de equipos recibida:', updatedTeams.length);
+            teams = updatedTeams;
+            if (currentTab === 'teams') {
+                renderTeams();
+            }
+            populateTeamSelects();
+        });
+        
+        socket.on('disconnect', () => {
+            console.log('❌ Admin desconectado del servidor WebSocket');
+        });
+    }
+}
 
 function initializeAdmin() {
     // Setup tab switching
@@ -49,6 +87,9 @@ function setupEventListeners() {
         clubForm.addEventListener('submit', handleClubSubmit);
     }
 
+    // Player management is now handled by the new tab system
+    // Event listeners are set up in setupPlayerEventListeners()
+
     // Match form submission
     const matchForm = document.getElementById('matchForm');
     if (matchForm) {
@@ -78,6 +119,10 @@ function switchTab(tabId) {
             break;
         case 'clubs':
             loadClubs();
+            break;
+        case 'players':
+            loadPlayers();
+            populateClubSelects();
             break;
         case 'matches':
             loadMatches();
@@ -279,6 +324,346 @@ async function deleteClub(clubId) {
     }
 }
 
+// ==================== PLAYERS MANAGEMENT ====================
+
+// Variables globales para el nuevo sistema
+let selectedTeamId = null;
+let teamPlayers = [];
+
+// Cargar jugadores y equipos
+async function loadPlayers() {
+    try {
+        const response = await fetch('/api/players');
+        if (!response.ok) throw new Error('Error fetching players');
+        
+        players = await response.json();
+        console.log('✅ Jugadores cargados:', players);
+        
+        // Cargar equipos y crear pestañas
+        await loadTeamsForPlayerManagement();
+        setupPlayerEventListeners();
+        
+    } catch (error) {
+        console.error('Error loading players:', error);
+        showNotification('Error cargando jugadores', 'error');
+        players = [];
+    }
+}
+
+// Cargar equipos para el sistema de pestañas
+async function loadTeamsForPlayerManagement() {
+    try {
+        const response = await fetch('/api/teams');
+        if (!response.ok) throw new Error('Error fetching teams');
+        
+        const teams = await response.json();
+        renderTeamTabs(teams);
+        
+    } catch (error) {
+        console.error('Error loading teams:', error);
+        showNotification('Error cargando equipos', 'error');
+    }
+}
+
+// Renderizar pestañas de equipos
+function renderTeamTabs(teams) {
+    const teamTabsContainer = document.getElementById('teamTabs');
+    if (!teamTabsContainer) return;
+    
+    teamTabsContainer.innerHTML = '';
+    
+    if (teams.length === 0) {
+        teamTabsContainer.innerHTML = `
+            <div style="text-align: center; color: rgba(255,255,255,0.6); padding: 20px;">
+                <p>No hay equipos disponibles. Agrega equipos primero en la pestaña de Equipos.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    teams.forEach(team => {
+        const tabElement = document.createElement('div');
+        tabElement.className = 'team-tab';
+        tabElement.dataset.teamId = team.id;
+        tabElement.innerHTML = `
+            <i class="fas fa-users"></i>
+            ${team.name}
+        `;
+        
+        tabElement.addEventListener('click', () => selectTeam(team.id, team.name));
+        teamTabsContainer.appendChild(tabElement);
+    });
+}
+
+// Seleccionar equipo
+function selectTeam(teamId, teamName) {
+    selectedTeamId = teamId;
+    
+    // Actualizar pestañas activas
+    document.querySelectorAll('.team-tab').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    document.querySelector(`[data-team-id="${teamId}"]`).classList.add('active');
+    
+    // Mostrar contenedor de input rápido
+    const quickAddContainer = document.getElementById('quickAddContainer');
+    const teamPlayersContainer = document.getElementById('teamPlayersContainer');
+    const selectedTeamNameElement = document.getElementById('selectedTeamName');
+    
+    if (quickAddContainer) quickAddContainer.style.display = 'block';
+    if (teamPlayersContainer) teamPlayersContainer.style.display = 'block';
+    if (selectedTeamNameElement) selectedTeamNameElement.textContent = teamName;
+    
+    // Cargar jugadores del equipo seleccionado
+    loadTeamPlayers(teamId);
+    
+    // Enfocar el input
+    const quickInput = document.getElementById('quickPlayerInput');
+    if (quickInput) {
+        quickInput.focus();
+        quickInput.value = '';
+    }
+}
+
+// Cargar jugadores del equipo seleccionado
+function loadTeamPlayers(teamId) {
+    teamPlayers = players.filter(player => player.clubId === teamId);
+    renderTeamPlayers();
+}
+
+// Renderizar jugadores del equipo
+function renderTeamPlayers() {
+    const teamPlayersGrid = document.getElementById('teamPlayersGrid');
+    const playersCount = document.getElementById('playersCount');
+    
+    if (!teamPlayersGrid || !playersCount) return;
+    
+    playersCount.textContent = `${teamPlayers.length} jugador${teamPlayers.length !== 1 ? 'es' : ''}`;
+    
+    teamPlayersGrid.innerHTML = '';
+    
+    if (teamPlayers.length === 0) {
+        teamPlayersGrid.innerHTML = `
+            <div style="grid-column: 1 / -1; text-align: center; color: rgba(255,255,255,0.6); padding: 20px;">
+                <i class="fas fa-running" style="font-size: 32px; margin-bottom: 10px; opacity: 0.3;"></i>
+                <p>No hay jugadores en este equipo. Agrega el primer jugador usando el input de arriba.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    // Configurar grid para tarjetas más pequeñas
+    teamPlayersGrid.style.display = 'grid';
+    teamPlayersGrid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(200px, 1fr))';
+    teamPlayersGrid.style.gap = '8px';
+    
+    teamPlayers.forEach(player => {
+        const playerCard = document.createElement('div');
+        playerCard.style.cssText = `
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(0, 255, 136, 0.2);
+            border-radius: 8px;
+            padding: 8px 10px;
+            transition: all 0.3s ease;
+            position: relative;
+            font-size: 13px;
+        `;
+        
+        playerCard.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="flex: 1; min-width: 0;">
+                    <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
+                        <span style="background: #00ff88; color: #0a0a0a; padding: 2px 6px; border-radius: 50%; font-weight: bold; font-size: 10px; min-width: 18px; text-align: center; line-height: 1;">
+                            ${player.number || '?'}
+                        </span>
+                        <span style="color: white; font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${player.name}</span>
+                    </div>
+                    <div style="color: rgba(255,255,255,0.6); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                        ${player.position || 'Jugador'} • ${player.age || '--'} años
+                    </div>
+                </div>
+                <div style="display: flex; gap: 3px; margin-left: 8px;">
+                    <button onclick="editPlayerQuick('${player.id}')" style="background: rgba(0,255,136,0.2); border: 1px solid #00ff88; color: #00ff88; padding: 4px; border-radius: 4px; cursor: pointer; font-size: 10px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button onclick="deletePlayerQuick('${player.id}')" style="background: rgba(255,0,0,0.2); border: 1px solid #ff4444; color: #ff4444; padding: 4px; border-radius: 4px; cursor: pointer; font-size: 10px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        // Hover effect más sutil
+        playerCard.addEventListener('mouseenter', () => {
+            playerCard.style.borderColor = '#00ff88';
+            playerCard.style.background = 'rgba(0, 255, 136, 0.08)';
+        });
+        
+        playerCard.addEventListener('mouseleave', () => {
+            playerCard.style.borderColor = 'rgba(0, 255, 136, 0.2)';
+            playerCard.style.background = 'rgba(255, 255, 255, 0.05)';
+        });
+        
+        teamPlayersGrid.appendChild(playerCard);
+    });
+}
+
+// Configurar event listeners para el sistema rápido
+function setupPlayerEventListeners() {
+    const quickInput = document.getElementById('quickPlayerInput');
+    const quickAddBtn = document.getElementById('quickAddBtn');
+    
+    if (quickInput) {
+        quickInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                addPlayerQuick();
+            }
+        });
+    }
+    
+    if (quickAddBtn) {
+        quickAddBtn.addEventListener('click', addPlayerQuick);
+    }
+}
+
+// Agregar jugador rápidamente
+async function addPlayerQuick() {
+    const quickInput = document.getElementById('quickPlayerInput');
+    const playerName = quickInput.value.trim();
+    
+    if (!playerName) {
+        showNotification('Por favor ingresa un nombre', 'error');
+        return;
+    }
+    
+    if (!selectedTeamId) {
+        showNotification('Por favor selecciona un equipo', 'error');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/players', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                name: playerName,
+                clubId: selectedTeamId,
+                position: 'Jugador',
+                age: 25,
+                number: getNextAvailableNumber(),
+                nationality: 'Panamá'
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error('Error al agregar jugador');
+        }
+        
+        const newPlayer = await response.json();
+        players.push(newPlayer);
+        loadTeamPlayers(selectedTeamId);
+        
+        quickInput.value = '';
+        quickInput.focus();
+        
+        showNotification(`Jugador "${playerName}" agregado exitosamente`, 'success');
+        
+    } catch (error) {
+        console.error('Error adding player:', error);
+        showNotification('Error al agregar jugador', 'error');
+    }
+}
+
+// Obtener siguiente número disponible
+function getNextAvailableNumber() {
+    const usedNumbers = teamPlayers.map(p => p.number).filter(n => n);
+    for (let i = 1; i <= 99; i++) {
+        if (!usedNumbers.includes(i)) {
+            return i;
+        }
+    }
+    return 1;
+}
+
+// Editar jugador (versión rápida)
+function editPlayerQuick(playerId) {
+    const player = players.find(p => p.id === playerId);
+    if (!player) return;
+    
+    const newName = prompt('Nuevo nombre del jugador:', player.name);
+    if (newName && newName.trim() !== player.name) {
+        updatePlayerQuick(playerId, { name: newName.trim() });
+    }
+}
+
+// Actualizar jugador
+async function updatePlayerQuick(playerId, updates) {
+    try {
+        const response = await fetch(`/api/players/${playerId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(updates)
+        });
+        
+        if (!response.ok) {
+            throw new Error('Error al actualizar jugador');
+        }
+        
+        const updatedPlayer = await response.json();
+        const playerIndex = players.findIndex(p => p.id === playerId);
+        if (playerIndex !== -1) {
+            players[playerIndex] = updatedPlayer;
+        }
+        
+        loadTeamPlayers(selectedTeamId);
+        showNotification('Jugador actualizado exitosamente', 'success');
+        
+    } catch (error) {
+        console.error('Error updating player:', error);
+        showNotification('Error al actualizar jugador', 'error');
+    }
+}
+
+// Eliminar jugador (versión rápida)
+function deletePlayerQuick(playerId) {
+    const player = players.find(p => p.id === playerId);
+    if (!player) return;
+    
+    if (confirm(`¿Estás seguro de que quieres eliminar a "${player.name}"?`)) {
+        deletePlayerFromAPI(playerId);
+    }
+}
+
+// Eliminar jugador de la API
+async function deletePlayerFromAPI(playerId) {
+    try {
+        const response = await fetch(`/api/players/${playerId}`, {
+            method: 'DELETE'
+        });
+        
+        if (!response.ok) {
+            throw new Error('Error al eliminar jugador');
+        }
+        
+        players = players.filter(p => p.id !== playerId);
+        loadTeamPlayers(selectedTeamId);
+        showNotification('Jugador eliminado exitosamente', 'success');
+        
+    } catch (error) {
+        console.error('Error deleting player:', error);
+        showNotification('Error al eliminar jugador', 'error');
+    }
+}
+
+
+
+
+
 // ==================== TEAMS MANAGEMENT ====================
 
 // Global variable for clubs
@@ -384,27 +769,43 @@ async function deleteTeam(teamId) {
     }
 }
 
+// Poblar selects de equipos
 function populateTeamSelects() {
     const homeTeamSelect = document.getElementById('homeTeam');
     const awayTeamSelect = document.getElementById('awayTeam');
-
+    
     if (!homeTeamSelect || !awayTeamSelect) return;
-
-    // Clear existing options (except first one)
-    homeTeamSelect.innerHTML = '<option value="">Seleccionar equipo...</option>';
-    awayTeamSelect.innerHTML = '<option value="">Seleccionar equipo...</option>';
-
-    teams.forEach(team => {
-        const homeOption = document.createElement('option');
-        homeOption.value = team.name;
-        homeOption.textContent = team.name;
-        homeTeamSelect.appendChild(homeOption);
-
-        const awayOption = document.createElement('option');
-        awayOption.value = team.name;
-        awayOption.textContent = team.name;
-        awayTeamSelect.appendChild(awayOption);
-    });
+    
+    // Limpiar selects
+    homeTeamSelect.innerHTML = '<option value="">Cargando equipos...</option>';
+    awayTeamSelect.innerHTML = '<option value="">Cargando equipos...</option>';
+    
+    // Cargar equipos desde la API
+    fetch('/api/teams')
+        .then(response => response.json())
+        .then(teams => {
+            // Limpiar selects
+            homeTeamSelect.innerHTML = '<option value="">Seleccionar equipo...</option>';
+            awayTeamSelect.innerHTML = '<option value="">Seleccionar equipo...</option>';
+            
+            // Agregar equipos a ambos selects
+            teams.forEach(team => {
+                const option1 = document.createElement('option');
+                option1.value = team.id;
+                option1.textContent = team.name;
+                homeTeamSelect.appendChild(option1);
+                
+                const option2 = document.createElement('option');
+                option2.value = team.id;
+                option2.textContent = team.name;
+                awayTeamSelect.appendChild(option2);
+            });
+        })
+        .catch(error => {
+            console.error('Error cargando equipos:', error);
+            homeTeamSelect.innerHTML = '<option value="">Error al cargar equipos</option>';
+            awayTeamSelect.innerHTML = '<option value="">Error al cargar equipos</option>';
+        });
 }
 
 // ==================== MATCHES MANAGEMENT ====================
@@ -1517,3 +1918,5 @@ window.updateZone = updateZone;
 window.removeZone = removeZone;
 window.updatePlayoffMatch = updatePlayoffMatch;
 window.clearPlayoffMatch = clearPlayoffMatch;
+window.editPlayerQuick = editPlayerQuick;
+window.deletePlayerQuick = deletePlayerQuick;

@@ -111,7 +111,8 @@
         }
 
         .teams-grid,
-        .matches-grid {
+        .matches-grid,
+        .players-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
             gap: 20px;
@@ -119,7 +120,8 @@
         }
 
         .team-card,
-        .match-card {
+        .match-card,
+        .player-card {
             background: rgba(255, 255, 255, 0.05);
             border: 2px solid rgba(0, 255, 136, 0.2);
             border-radius: 12px;
@@ -128,7 +130,8 @@
         }
 
         .team-card:hover,
-        .match-card:hover {
+        .match-card:hover,
+        .player-card:hover {
             border-color: #00ff88;
             transform: translateY(-5px);
         }
@@ -274,6 +277,200 @@
             align-items: center;
             justify-content: center;
         }
+
+        .player-photo {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid #00ff88;
+            margin-bottom: 15px;
+        }
+
+        .player-photo-placeholder {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: rgba(0, 255, 136, 0.1);
+            color: #00ff88;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 3px solid #00ff88;
+            margin-bottom: 15px;
+        }
+
+        .player-name {
+            color: #00ff88;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .player-info {
+            color: rgba(255, 255, 255, 0.8);
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+
+        .player-number {
+            background: #00ff88;
+            color: #0a0a0a;
+            padding: 4px 8px;
+            border-radius: 50%;
+            font-weight: bold;
+            font-size: 14px;
+            display: inline-block;
+            margin-bottom: 10px;
+        }
+
+        .player-position {
+            background: rgba(0, 255, 136, 0.2);
+            color: #00ff88;
+            padding: 4px 8px;
+            border-radius: 15px;
+            font-size: 12px;
+            display: inline-block;
+            margin-bottom: 10px;
+        }
+
+        /* Team Tabs Styles */
+        .team-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+
+        .team-tab {
+            background: rgba(0, 255, 136, 0.1);
+            border: 2px solid rgba(0, 255, 136, 0.3);
+            color: #00ff88;
+            padding: 12px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            font-size: 14px;
+            min-width: 120px;
+            text-align: center;
+        }
+
+        .team-tab:hover {
+            background: rgba(0, 255, 136, 0.2);
+            border-color: #00ff88;
+            transform: translateY(-2px);
+        }
+
+        .team-tab.active {
+            background: #00ff88;
+            color: #0a0a0a;
+            border-color: #00ff88;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+        }
+
+        /* Quick Add Container */
+        .quick-add-container {
+            background: rgba(0, 255, 136, 0.05);
+            border: 2px solid rgba(0, 255, 136, 0.2);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .quick-add-header h3 {
+            color: #00ff88;
+            margin: 0 0 5px 0;
+            font-size: 20px;
+        }
+
+        .quick-add-header p {
+            color: rgba(255, 255, 255, 0.7);
+            margin: 0 0 20px 0;
+            font-size: 14px;
+        }
+
+        .quick-input-bar {
+            display: flex;
+            max-width: 400px;
+            margin: 0 auto;
+            gap: 10px;
+        }
+
+        .quick-input-bar input {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(0, 255, 136, 0.3);
+            border-radius: 25px;
+            padding: 12px 20px;
+            color: white;
+            font-size: 16px;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .quick-input-bar input:focus {
+            border-color: #00ff88;
+            background: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 0 15px rgba(0, 255, 136, 0.3);
+        }
+
+        .quick-input-bar input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .quick-input-bar button {
+            background: #00ff88;
+            border: none;
+            border-radius: 50%;
+            width: 45px;
+            height: 45px;
+            color: #0a0a0a;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        .quick-input-bar button:hover {
+            background: #00cc6a;
+            transform: scale(1.1);
+        }
+
+        /* Team Players Container */
+        .team-players-container {
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 15px;
+            padding: 20px;
+        }
+
+        .team-players-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid rgba(0, 255, 136, 0.2);
+        }
+
+        .team-players-header h4 {
+            color: #00ff88;
+            margin: 0;
+            font-size: 18px;
+        }
+
+        .team-players-header span {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 14px;
+            background: rgba(0, 255, 136, 0.1);
+            padding: 5px 12px;
+            border-radius: 15px;
+        }
     </style>
 </head>
 <body>
@@ -290,6 +487,7 @@
                 <li><a href="index.html" class="nav-link">Inicio</a></li>
                 <li><a href="standings.html" class="nav-link">Posiciones</a></li>
                 <li><a href="clips.html" class="nav-link">Clips</a></li>
+                <li><a href="jugadores.html" class="nav-link">Jugadores</a></li>
                 <li><a href="admin.html" class="nav-link active">Admin</a></li>
             </ul>
             <div class="hamburger">
@@ -322,6 +520,9 @@
             </button>
             <button class="admin-tab-btn" data-tab="config">
                 <i class="fas fa-cog"></i> Configuración
+            </button>
+            <button class="admin-tab-btn" data-tab="players">
+                <i class="fas fa-running"></i> Jugadores
             </button>
             <button class="admin-tab-btn" data-tab="playoffs">
                 <i class="fas fa-medal"></i> Playoffs
@@ -396,6 +597,42 @@
 
             <div class="clubs-grid" id="clubsGrid">
                 <!-- Clubs will be loaded here -->
+            </div>
+        </div>
+
+        <!-- Players Section -->
+        <div class="admin-section" id="players">
+            <h2><i class="fas fa-running"></i> Gestión de Jugadores</h2>
+            <p style="color: rgba(255,255,255,0.7); margin-bottom: 20px;">Selecciona un equipo y agrega jugadores rápidamente</p>
+            
+            <!-- Team Tabs -->
+            <div class="team-tabs" id="teamTabs">
+                <!-- Team tabs will be loaded here -->
+            </div>
+
+            <!-- Quick Add Player -->
+            <div class="quick-add-container" id="quickAddContainer" style="display: none;">
+                <div class="quick-add-header">
+                    <h3 id="selectedTeamName">Equipo Seleccionado</h3>
+                    <p>Escribe el nombre del jugador y presiona Enter</p>
+                </div>
+                <div class="quick-input-bar">
+                    <input type="text" id="quickPlayerInput" placeholder="Nombre del jugador..." autocomplete="off">
+                    <button type="button" id="quickAddBtn">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Players List for Selected Team -->
+            <div class="team-players-container" id="teamPlayersContainer" style="display: none;">
+                <div class="team-players-header">
+                    <h4>Jugadores del Equipo</h4>
+                    <span id="playersCount">0 jugadores</span>
+                </div>
+                <div class="players-grid" id="teamPlayersGrid">
+                    <!-- Players for selected team will be loaded here -->
+                </div>
             </div>
         </div>
 
@@ -556,6 +793,8 @@
     <!-- Notification -->
     <div id="notification" class="notification"></div>
 
+    <!-- Socket.IO for real-time updates -->
+    <script src="/socket.io/socket.io.js"></script>
     <script src="admin.js"></script>
 </body>
 </html>

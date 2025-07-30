@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jugadores - Liga Panameña de Clubes Pro</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .players-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            margin-top: 100px;
+        }
+
+        .players-header {
+            text-align: center;
+            margin-bottom: 40px;
+            color: #00ff88;
+        }
+
+        .players-header h1 {
+            font-family: 'Orbitron', monospace;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+        }
+
+        .club-selector {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 40px;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .club-btn {
+            background: rgba(0, 255, 136, 0.1);
+            border: 2px solid #00ff88;
+            color: #00ff88;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .club-btn.active,
+        .club-btn:hover {
+            background: #00ff88;
+            color: #0a0a0a;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 255, 136, 0.4);
+        }
+
+        .players-grid {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-start;
+            gap: 8px;
+            margin-top: 30px;
+            padding: 10px;
+        }
+
+        .player-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(0, 255, 136, 0.2);
+            border-radius: 15px;
+            padding: 25px;
+            text-align: center;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .player-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #00ff88, #00cc6a);
+        }
+
+        .player-card:hover {
+            border-color: #00ff88;
+            transform: translateY(-8px);
+            box-shadow: 0 10px 30px rgba(0, 255, 136, 0.2);
+        }
+
+        .player-photo {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 4px solid #00ff88;
+            margin-bottom: 20px;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+        }
+
+        .player-photo-placeholder {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: rgba(0, 255, 136, 0.1);
+            color: #00ff88;
+            font-size: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 4px solid #00ff88;
+            margin: 0 auto 20px;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+        }
+
+        .player-number {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: #00ff88;
+            color: #0a0a0a;
+            padding: 8px 12px;
+            border-radius: 50%;
+            font-weight: bold;
+            font-size: 16px;
+            box-shadow: 0 2px 10px rgba(0, 255, 136, 0.4);
+        }
+
+        .player-name {
+            color: #00ff88;
+            font-size: 1.4rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+            font-family: 'Orbitron', monospace;
+        }
+
+        .player-position {
+            background: rgba(0, 255, 136, 0.2);
+            color: #00ff88;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            display: inline-block;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .player-info {
+            color: rgba(255, 255, 255, 0.8);
+            margin-bottom: 8px;
+            font-size: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .player-info i {
+            color: #00ff88;
+            width: 16px;
+        }
+
+        .no-players {
+            grid-column: 1 / -1;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.6);
+            padding: 60px 20px;
+        }
+
+        .no-players i {
+            font-size: 64px;
+            margin-bottom: 20px;
+            opacity: 0.3;
+            color: #00ff88;
+        }
+
+        .loading {
+            grid-column: 1 / -1;
+            text-align: center;
+            color: #00ff88;
+            padding: 60px 20px;
+        }
+
+        .loading i {
+            font-size: 48px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .club-info {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            text-align: center;
+            border: 2px solid rgba(0, 255, 136, 0.2);
+        }
+
+        .club-logo {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid #00ff88;
+            margin: 0 auto 15px;
+            display: block;
+        }
+
+        .club-name {
+            color: #00ff88;
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            font-family: 'Orbitron', monospace;
+        }
+
+        .club-description {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 16px;
+            line-height: 1.5;
+        }
+
+        .stats-bar {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-number {
+            color: #00ff88;
+            font-size: 2rem;
+            font-weight: bold;
+            display: block;
+            font-family: 'Orbitron', monospace;
+        }
+
+        .stat-label {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        @media (max-width: 768px) {
+            .players-container {
+                padding: 15px;
+                margin-top: 80px;
+            }
+
+            .players-header h1 {
+                font-size: 2rem;
+            }
+
+            .club-selector {
+                gap: 8px;
+            }
+
+            .club-btn {
+                padding: 10px 16px;
+                font-size: 14px;
+            }
+
+            .players-grid {
+                grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+                gap: 20px;
+            }
+
+            .stats-bar {
+                gap: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <div class="logo-circle">
+                    <img src="/img/LPCP Logo.jpg" alt="Logo LPCP" class="logo-img">
+                </div>
+                <span class="logo-text">LPCP</span>
+            </div>
+            <ul class="nav-menu">
+                <li class="nav-item"><a href="index.html" class="nav-link">Inicio</a></li>
+                <li class="nav-item"><a href="standings.html" class="nav-link">Torneo</a></li>
+                <li class="nav-item"><a href="clips.html" class="nav-link">Clips</a></li>
+                <li class="nav-item"><a href="jugadores.html" class="nav-link active">Jugadores</a></li>
+            </ul>
+            <div class="hamburger">
+                <span class="bar"></span>
+                <span class="bar"></span>
+                <span class="bar"></span>
+            </div>
+        </div>
+    </nav>
+
+    <div class="players-container">
+        <div class="players-header">
+            <h1><i class="fas fa-running"></i> Jugadores LPCP</h1>
+            <p>Conoce a los jugadores de cada equipo de la Liga Panameña de Clubes Pro</p>
+        </div>
+
+        <!-- Club Selector -->
+        <div class="club-selector" id="clubSelector">
+            <button class="club-btn active" data-club="all">
+                <i class="fas fa-users"></i> Todos los Jugadores
+            </button>
+        </div>
+
+        <!-- Club Info -->
+        <div class="club-info" id="clubInfo" style="display: none;">
+            <img id="clubLogo" class="club-logo" src="" alt="" onerror="this.style.display='none'">
+            <div class="club-name" id="clubName"></div>
+            <div class="club-description" id="clubDescription"></div>
+            <div class="stats-bar">
+                <div class="stat-item">
+                    <span class="stat-number" id="playerCount">0</span>
+                    <span class="stat-label">Jugadores</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Players Grid -->
+        <div class="players-grid" id="playersGrid">
+            <div class="loading">
+                <i class="fas fa-spinner"></i>
+                <p>Cargando jugadores...</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="jugadores.js"></script>
+</body>
+</html>

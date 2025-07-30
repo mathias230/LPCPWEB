@@ -71,36 +71,29 @@
       "name": "WEST SIDE PTY",
       "founded": 2023,
       "stadium": "West Side Stadium"
-    }
-  ],
-  "matches": [
+    },
     {
-      "id": 1753723981205,
-      "homeTeam": "Tiki Taka FC",
-      "awayTeam": "BKS FC",
-      "date": "2222-02-22",
-      "time": "22:22",
-      "matchday": 1,
-      "status": "finished",
-      "homeScore": 2,
-      "awayScore": 3
+      "id": 1753889425247,
+      "name": "ffff",
+      "logo": "img/default-team.png"
     }
   ],
+  "matches": [],
   "standings": [
     {
-      "team": "BKS FC",
-      "played": 1,
-      "won": 1,
+      "team": "ACP 507",
+      "played": 0,
+      "won": 0,
       "drawn": 0,
       "lost": 0,
-      "goalsFor": 3,
-      "goalsAgainst": 2,
-      "goalDifference": 1,
-      "points": 3,
+      "goalsFor": 0,
+      "goalsAgainst": 0,
+      "goalDifference": 0,
+      "points": 0,
       "position": 1
     },
     {
-      "team": "ACP 507",
+      "team": "BKS FC",
       "played": 0,
       "won": 0,
       "drawn": 0,
@@ -208,7 +201,7 @@
       "position": 10
     },
     {
-      "team": "WEST SIDE PTY",
+      "team": "Tiki Taka FC",
       "played": 0,
       "won": 0,
       "drawn": 0,
@@ -220,16 +213,28 @@
       "position": 11
     },
     {
-      "team": "Tiki Taka FC",
-      "played": 1,
+      "team": "WEST SIDE PTY",
+      "played": 0,
       "won": 0,
       "drawn": 0,
-      "lost": 1,
-      "goalsFor": 2,
-      "goalsAgainst": 3,
-      "goalDifference": -1,
+      "lost": 0,
+      "goalsFor": 0,
+      "goalsAgainst": 0,
+      "goalDifference": 0,
       "points": 0,
       "position": 12
+    },
+    {
+      "team": "ffff",
+      "played": 0,
+      "won": 0,
+      "drawn": 0,
+      "lost": 0,
+      "goalsFor": 0,
+      "goalsAgainst": 0,
+      "goalDifference": 0,
+      "points": 0,
+      "position": 13
     }
   ],
   "settings": {
@@ -252,90 +257,104 @@
       }
     ]
   },
-  "currentBracket": {
-    "format": "8",
-    "teams": [
-      "Jumpers FC",
-      "Coiner FC",
-      "WEST SIDE PTY",
-      "ACP 507",
-      "BKS FC",
-      "FC WEST SIDE",
-      "LOS PLEBES Tk",
-      "Punta Coco FC"
-    ],
-    "matches": [
-      {
-        "id": "match_1",
-        "round": 1,
-        "roundName": "Cuartos de Final",
-        "homeTeam": "Jumpers FC",
-        "awayTeam": "Punta Coco FC",
-        "homeScore": 4,
-        "awayScore": 2,
-        "status": "finished"
-      },
-      {
-        "id": "match_2",
-        "round": 1,
-        "roundName": "Cuartos de Final",
-        "homeTeam": "Coiner FC",
-        "awayTeam": "LOS PLEBES Tk",
-        "homeScore": 3,
-        "awayScore": 4,
-        "status": "finished"
-      },
-      {
-        "id": "match_3",
-        "round": 1,
-        "roundName": "Cuartos de Final",
-        "homeTeam": "WEST SIDE PTY",
-        "awayTeam": "FC WEST SIDE",
-        "homeScore": 2,
-        "awayScore": 1,
-        "status": "finished"
-      },
-      {
-        "id": "match_4",
-        "round": 1,
-        "roundName": "Cuartos de Final",
-        "homeTeam": "ACP 507",
-        "awayTeam": "BKS FC",
-        "homeScore": 3,
-        "awayScore": 2,
-        "status": "finished"
-      },
-      {
-        "id": "match_5",
-        "round": 2,
-        "roundName": "Semifinales",
-        "homeTeam": "Jumpers FC",
-        "awayTeam": "LOS PLEBES Tk",
-        "homeScore": 3,
-        "awayScore": 2,
-        "status": "finished"
-      },
-      {
-        "id": "match_6",
-        "round": 2,
-        "roundName": "Semifinales",
-        "homeTeam": "WEST SIDE PTY",
-        "awayTeam": "ACP 507",
-        "homeScore": 2,
-        "awayScore": 1,
-        "status": "finished"
-      },
-      {
-        "id": "match_7",
-        "round": 3,
-        "roundName": "Final",
-        "homeTeam": "Jumpers FC",
-        "awayTeam": "WEST SIDE PTY",
-        "homeScore": 1,
-        "awayScore": 0,
-        "status": "finished"
-      }
-    ],
-    "createdAt": "2025-07-28T16:20:46.746Z"
-  }
+  "bracket": null,
+  "clubs": [
+    {
+      "id": 1,
+      "name": "ACP 507",
+      "description": "Representando la tradición canalera con orgullo y determinación.",
+      "founded": 2020,
+      "players": 15,
+      "logo": "/img/APC 507.png"
+    },
+    {
+      "id": 2,
+      "name": "BKS FC",
+      "description": "Fuerza y determinación caracterizan a este equipo competitivo.",
+      "founded": 2023,
+      "players": 16,
+      "logo": "/img/BKS FC.jpg"
+    },
+    {
+      "id": 3,
+      "name": "Coiner FC",
+      "description": "Estrategia y precisión definen el estilo de juego de este equipo.",
+      "founded": 2019,
+      "players": 16,
+      "logo": "/img/Coiner FC.jpg"
+    },
+    {
+      "id": 4,
+      "name": "FC WEST SIDE",
+      "description": "Desde el oeste de Panamá, con pasión y técnica incomparable.",
+      "founded": 2021,
+      "players": 16,
+      "logo": "/img/West side.jpg"
+    },
+    {
+      "id": 5,
+      "name": "Humacao FC",
+      "description": "Tradición y garra desde Humacao, siempre luchando por la victoria.",
+      "founded": 2020,
+      "players": 11,
+      "logo": "/img/Humacao fc.jpg"
+    },
+    {
+      "id": 6,
+      "name": "Jumpers FC",
+      "description": "Agilidad y velocidad son las armas de este dinámico equipo.",
+      "founded": 2022,
+      "players": 12,
+      "logo": "/img/Jumpers FC.jpg"
+    },
+    {
+      "id": 7,
+      "name": "LOS PLEBES Tk",
+      "description": "Juventud y energía desbordante en cada jugada del partido.",
+      "founded": 2021,
+      "players": 12,
+      "logo": "/img/Los Plebes.jpg"
+    },
+    {
+      "id": 8,
+      "name": "Punta Coco FC",
+      "description": "Desde la costa, con el espíritu del mar y la determinación.",
+      "founded": 2018,
+      "players": 17,
+      "logo": "/img/Punta Coco FC.png"
+    },
+    {
+      "id": 9,
+      "name": "Pura Vibra",
+      "description": "Energía pura y pasión desmedida en cada encuentro deportivo.",
+      "founded": 2022,
+      "players": 17,
+      "logo": "/img/Pura vibra.png"
+    },
+    {
+      "id": 10,
+      "name": "Rayos X FC",
+      "description": "Precisión quirúrgica y visión de juego excepcional.",
+      "founded": 2020,
+      "players": 15,
+      "logo": "/img/Rayos x FC.jpg"
+    },
+    {
+      "id": 11,
+      "name": "Tiki Taka FC",
+      "description": "Maestros del pase corto y el juego de posesión.",
+      "founded": 2021,
+      "players": 13,
+      "logo": "/img/Tiki taka FC.jpg"
+    },
+    {
+      "id": 12,
+      "name": "WEST SIDE PTY",
+      "description": "Representando el oeste con orgullo y técnica depurada.",
+      "founded": 2023,
+      "players": 11,
+      "logo": "/img/West Side PTY.jpg"
+    }
+  ],
+  "players": []
 }

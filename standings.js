@@ -45,7 +45,16 @@ function setupWebSocket() {
     
     socket.on('teamsUpdate', (updatedTeams) => {
         console.log('👥 Actualizando equipos...');
-        // Update teams data if needed
+        // Actualizar datos de equipos y regenerar tabla de posiciones
+        console.log('📊 Regenerando tabla de posiciones con nuevos equipos...');
+        
+        // Recargar datos de la tabla de posiciones para incluir nuevos equipos
+        loadStandingsData();
+        
+        // Si estamos viendo la tabla, actualizarla inmediatamente
+        if (document.querySelector('#table.active')) {
+            loadStandingsTable();
+        }
     });
     
     socket.on('classificationZonesUpdate', (updatedZones) => {
