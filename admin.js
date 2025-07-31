@@ -131,6 +131,10 @@ function switchTab(tabId) {
         case 'results':
             loadPendingMatches();
             break;
+        case 'calendar':
+        case 'calendario':
+            loadCalendarMatches();
+            break;
         case 'config':
             loadConfiguration();
             break;
@@ -838,50 +842,148 @@ function populateTeamSelects() {
 // ==================== MATCHES MANAGEMENT ====================
 
 async function loadMatches() {
+    const matchesGrid = document.getElementById('matchesGrid');
+    if (!matchesGrid) return;
+    
+    // Mostrar indicador de carga
+    matchesGrid.innerHTML = '<div class="loading">Cargando partidos...</div>';
+    
     try {
-        const response = await fetch('/api/tournament/matches');
-        if (!response.ok) throw new Error('Error fetching matches');
+        // Agregar timeout para evitar que se quede cargando indefinidamente
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos de timeout
+        
+        const response = await fetch('/api/tournament/matches', {
+            signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+            throw new Error(`Error ${response.status}: ${response.statusText}`);
+        }
         
         matches = await response.json();
-        if (currentTab === 'matches') {
-            renderMatches();
-        }
+        console.log('Partidos cargados:', matches); // Debug
+        
+        // Siempre renderizar los partidos cuando se cargan
+        renderMatches();
     } catch (error) {
         console.error('Error loading matches:', error);
-        showNotification('Error cargando partidos', 'error');
+        matchesGrid.innerHTML = `
+            <div class="error-message">
+                <i class="fas fa-exclamation-triangle"></i>
+                <p>Error al cargar los partidos</p>
+                <button class="btn btn-retry" onclick="loadMatches()">
+                    <i class="fas fa-sync-alt"></i> Reintentar
+                </button>
+            </div>
+        `;
     }
 }
 
 function renderMatches() {
+    console.log('🎯 Iniciando renderMatches...');
     const matchesGrid = document.getElementById('matchesGrid');
-    if (!matchesGrid) return;
-
-    matchesGrid.innerHTML = '';
-
-    matches.forEach(match => {
-        const matchCard = document.createElement('div');
-        matchCard.className = 'match-card';
+    
+    if (!matchesGrid) {
+        console.error('❌ No se encontró el elemento matchesGrid');
+        return;
+    }
+    
+    console.log('✅ Elemento matchesGrid encontrado');
+    console.log('📊 Partidos a renderizar:', matches);
+    
+    try {
+        // Limpiar contenido
+        matchesGrid.innerHTML = '';
         
-        const statusText = match.status === 'finished' ? 'Finalizado' : 'Programado';
-        const scoreText = match.status === 'finished' && match.homeScore !== null && match.awayScore !== null 
-            ? `${match.homeScore} - ${match.awayScore}` 
-            : 'vs';
+        if (!Array.isArray(matches) || matches.length === 0) {
+            console.log('⚠️ No hay partidos para mostrar');
+            matchesGrid.innerHTML = `
+                <div class="no-matches" style="text-align: center; padding: 40px; color: rgba(255,255,255,0.7);">
+                    <i class="fas fa-futbol" style="font-size: 48px; margin-bottom: 20px; display: block;"></i>
+                    <p>No hay partidos programados</p>
+                </div>
+            `;
+            return;
+        }
 
-        matchCard.innerHTML = `
-            <div class="match-teams">${match.homeTeam} ${scoreText} ${match.awayTeam}</div>
-            <div class="match-info">
-                <i class="fas fa-calendar"></i> ${match.date} - ${match.time}<br>
-                <i class="fas fa-futbol"></i> Jornada ${match.matchday}<br>
-                <i class="fas fa-info-circle"></i> ${statusText}
-            </div>
-            <div class="match-actions">
-                <button class="btn btn-danger" onclick="deleteMatch(${match.id})">
-                    <i class="fas fa-trash"></i> Eliminar
+        console.log(`🔄 Renderizando ${matches.length} partidos...`);
+        
+        matches.forEach((match, index) => {
+            if (!match) {
+                console.warn(`⚠️ Partido ${index} es null/undefined`);
+                return;
+            }
+            
+            console.log(`🏆 Renderizando partido ${index + 1}:`, match);
+            
+            const matchCard = document.createElement('div');
+            matchCard.className = 'match-card';
+            matchCard.style.cssText = `
+                background: rgba(255, 255, 255, 0.05);
+                border: 1px solid rgba(0, 255, 136, 0.3);
+                border-radius: 12px;
+                padding: 20px;
+                margin-bottom: 20px;
+                transition: all 0.3s ease;
+            `;
+            
+            const statusText = match.status === 'finished' ? 'Finalizado' : 'Programado';
+            const scoreText = match.status === 'finished' && match.homeScore !== null && match.awayScore !== null 
+                ? `${match.homeScore} - ${match.awayScore}` 
+                : 'vs';
+
+            // Valores seguros
+            const homeTeam = String(match.homeTeam || 'Equipo Local');
+            const awayTeam = String(match.awayTeam || 'Equipo Visitante');
+            const matchDate = String(match.date || 'Sin fecha');
+            const matchTime = String(match.time || 'Sin hora');
+            const matchday = String(match.matchday || 'N/A');
+            const matchId = match.id || 'unknown';
+
+            // HTML simplificado y seguro
+            matchCard.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h4 style="color: #00ff88; margin: 0;">Partido #${matchId}</h4>
+                    <span style="background: ${match.status === 'finished' ? '#00ff88' : '#ffa500'}; color: #000; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold;">${statusText}</span>
+                </div>
+                <div style="text-align: center; margin: 20px 0;">
+                    <div style="display: flex; align-items: center; justify-content: center; gap: 20px;">
+                        <span style="color: #fff; font-weight: bold; font-size: 16px;">${homeTeam}</span>
+                        <span style="color: #00ff88; font-weight: bold; font-size: 18px;">${scoreText}</span>
+                        <span style="color: #fff; font-weight: bold; font-size: 16px;">${awayTeam}</span>
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; color: rgba(255,255,255,0.7); font-size: 14px;">
+                    <span><i class="fas fa-calendar"></i> ${matchDate} - ${matchTime}</span>
+                    <span><i class="fas fa-futbol"></i> Jornada ${matchday}</span>
+                </div>
+                <div style="margin-top: 15px; text-align: center;">
+                    <button class="btn btn-danger" onclick="deleteMatch(${matchId})" style="background: #ff4757; border: none; color: white; padding: 8px 16px; border-radius: 8px; cursor: pointer;">
+                        <i class="fas fa-trash"></i> Eliminar
+                    </button>
+                </div>
+            `;
+            
+            matchesGrid.appendChild(matchCard);
+        });
+        
+        console.log('✅ Partidos renderizados exitosamente');
+        
+    } catch (error) {
+        console.error('❌ Error al renderizar partidos:', error);
+        matchesGrid.innerHTML = `
+            <div style="text-align: center; padding: 40px; color: #ff4757;">
+                <i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 20px; display: block;"></i>
+                <p>Error al cargar los partidos</p>
+                <button onclick="loadMatches()" style="background: #00ff88; color: #000; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; margin-top: 10px;">
+                    Reintentar
                 </button>
             </div>
         `;
-        matchesGrid.appendChild(matchCard);
-    });
+    }
 }
 
 async function handleMatchSubmit(e) {
@@ -957,19 +1059,148 @@ async function deleteMatch(matchId) {
     }
 }
 
+// ==================== CALENDAR MANAGEMENT ====================
+
+async function loadCalendarMatches() {
+    const calendarGrid = document.getElementById('calendarGrid');
+    if (!calendarGrid) return;
+    
+    // Mostrar indicador de carga
+    calendarGrid.innerHTML = '<div class="loading">Cargando calendario...</div>';
+    
+    try {
+        const response = await fetch('/api/tournament/matches');
+        if (!response.ok) throw new Error('Error fetching matches');
+        
+        const allMatches = await response.json();
+        console.log('Partidos cargados para calendario:', allMatches);
+        renderCalendarMatches(allMatches);
+    } catch (error) {
+        console.error('Error loading calendar matches:', error);
+        calendarGrid.innerHTML = `
+            <div class="error-message">
+                <i class="fas fa-exclamation-triangle"></i>
+                <p>Error al cargar el calendario</p>
+                <button class="btn btn-retry" onclick="loadCalendarMatches()">
+                    <i class="fas fa-sync-alt"></i> Reintentar
+                </button>
+            </div>
+        `;
+    }
+}
+
+function renderCalendarMatches(matches) {
+    const calendarGrid = document.getElementById('calendarGrid');
+    if (!calendarGrid) return;
+    
+    calendarGrid.innerHTML = '';
+    
+    if (!Array.isArray(matches) || matches.length === 0) {
+        calendarGrid.innerHTML = `
+            <div class="no-matches">
+                <i class="fas fa-calendar-times"></i>
+                <p>No hay partidos programados</p>
+            </div>
+        `;
+        return;
+    }
+    
+    // Agrupar partidos por fecha
+    const matchesByDate = {};
+    matches.forEach(match => {
+        if (!match || !match.date) return;
+        
+        const date = match.date;
+        if (!matchesByDate[date]) {
+            matchesByDate[date] = [];
+        }
+        matchesByDate[date].push(match);
+    });
+    
+    // Ordenar fechas
+    const sortedDates = Object.keys(matchesByDate).sort();
+    
+    sortedDates.forEach(date => {
+        const dateHeader = document.createElement('div');
+        dateHeader.className = 'calendar-date-header';
+        dateHeader.innerHTML = `
+            <h3><i class="fas fa-calendar-day"></i> ${new Date(date).toLocaleDateString('es-ES', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            })}</h3>
+        `;
+        calendarGrid.appendChild(dateHeader);
+        
+        const dateMatches = matchesByDate[date].sort((a, b) => {
+            const timeA = a.time || '00:00';
+            const timeB = b.time || '00:00';
+            return timeA.localeCompare(timeB);
+        });
+        
+        const matchesContainer = document.createElement('div');
+        matchesContainer.className = 'calendar-matches-container';
+        
+        dateMatches.forEach(match => {
+            const matchCard = document.createElement('div');
+            matchCard.className = `calendar-match-card ${match.status}`;
+            
+            const statusText = match.status === 'finished' ? 'Finalizado' : 'Programado';
+            const scoreText = match.status === 'finished' && match.homeScore !== null && match.awayScore !== null 
+                ? `${match.homeScore} - ${match.awayScore}` 
+                : 'vs';
+            
+            matchCard.innerHTML = `
+                <div class="match-time">
+                    <i class="fas fa-clock"></i> ${match.time || 'Sin hora'}
+                </div>
+                <div class="match-teams">
+                    <span class="team">${match.homeTeam || 'Equipo Local'}</span>
+                    <span class="score">${scoreText}</span>
+                    <span class="team">${match.awayTeam || 'Equipo Visitante'}</span>
+                </div>
+                <div class="match-details">
+                    <span class="matchday">Jornada ${match.matchday || 'N/A'}</span>
+                    <span class="status ${match.status}">${statusText}</span>
+                </div>
+            `;
+            
+            matchesContainer.appendChild(matchCard);
+        });
+        
+        calendarGrid.appendChild(matchesContainer);
+    });
+}
+
 // ==================== RESULTS MANAGEMENT ====================
 
 async function loadPendingMatches() {
+    const resultsGrid = document.getElementById('resultsGrid');
+    if (!resultsGrid) return;
+    
+    // Mostrar indicador de carga
+    resultsGrid.innerHTML = '<div class="loading">Cargando partidos...</div>';
+    
     try {
         // Cargar TODOS los partidos (programados y finalizados)
         const response = await fetch('/api/tournament/matches');
         if (!response.ok) throw new Error('Error fetching matches');
         
         const allMatches = await response.json();
+        console.log('Partidos cargados para resultados:', allMatches); // Debug
         renderAllMatches(allMatches);
     } catch (error) {
         console.error('Error loading matches:', error);
-        showNotification('Error cargando partidos', 'error');
+        resultsGrid.innerHTML = `
+            <div class="error-message">
+                <i class="fas fa-exclamation-triangle"></i>
+                <p>Error al cargar los partidos</p>
+                <button class="btn btn-retry" onclick="loadPendingMatches()">
+                    <i class="fas fa-sync-alt"></i> Reintentar
+                </button>
+            </div>
+        `;
     }
 }
 

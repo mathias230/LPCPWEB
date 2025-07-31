@@ -644,12 +644,30 @@ function showNotification(message, type = 'info') {
 
 // Load fixtures tab with matchday navigation
 function loadFixtures() {
+    console.log('🎯 Iniciando loadFixtures...');
     const fixturesContainer = document.getElementById('fixturesContainer');
-    if (!fixturesContainer) return;
+    if (!fixturesContainer) {
+        console.error('❌ No se encontró fixturesContainer');
+        return;
+    }
+    
+    console.log('📊 fixturesData disponible:', fixturesData);
+    console.log('📊 Cantidad de partidos:', fixturesData ? fixturesData.length : 0);
+    console.log('📊 teamsData disponible:', teamsData);
+    console.log('📊 Cantidad de equipos:', teamsData ? teamsData.length : 0);
     
     // Usar datos ya generados, no generar nuevos
     if (!fixturesData || fixturesData.length === 0) {
-        console.warn('No hay datos de partidos disponibles');
+        console.warn('⚠️ No hay datos de partidos disponibles');
+        fixturesContainer.innerHTML = `
+            <div style="text-align: center; padding: 40px; color: rgba(255,255,255,0.7);">
+                <i class="fas fa-futbol" style="font-size: 48px; margin-bottom: 20px; display: block;"></i>
+                <p>No hay partidos disponibles</p>
+                <button onclick="loadAllData()" style="background: #00ff88; color: #000; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; margin-top: 10px;">
+                    Recargar datos
+                </button>
+            </div>
+        `;
         return;
     }
     
@@ -798,12 +816,12 @@ function createMatchCard(match) {
     const transparentPixel = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
     
     // Get team info with fallback to default values
-    const homeTeamInfo = teams.find(t => t.name === match.homeTeam) || { 
+    const homeTeamInfo = teamsData.find(t => t.name === match.homeTeam) || { 
         name: match.homeTeam, 
         logo: transparentPixel 
     };
     
-    const awayTeamInfo = teams.find(t => t.name === match.awayTeam) || { 
+    const awayTeamInfo = teamsData.find(t => t.name === match.awayTeam) || { 
         name: match.awayTeam, 
         logo: transparentPixel 
     };

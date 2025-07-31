@@ -93,8 +93,8 @@
       "time": "19:00",
       "matchday": 1,
       "status": "finished",
-      "homeScore": 1,
-      "awayScore": 2
+      "homeScore": null,
+      "awayScore": null
     },
     {
       "id": 1753728220778,
@@ -139,6 +139,21 @@
       "status": "finished",
       "homeScore": 1,
       "awayScore": 0
+    },
+    {
+      "id": 1753989309280,
+      "homeTeam": "Punta Coco FC",
+      "awayTeam": "Rayos X FC",
+      "homeTeamId": 8,
+      "awayTeamId": 10,
+      "homeTeamLogo": "img/default-team.png",
+      "awayTeamLogo": "img/default-team.png",
+      "date": "2000-11-11",
+      "time": "11:11",
+      "matchday": 1,
+      "status": "scheduled",
+      "homeScore": null,
+      "awayScore": null
     }
   ],
   "standings": [
@@ -167,18 +182,6 @@
       "position": 2
     },
     {
-      "team": "FC WEST SIDE",
-      "played": 1,
-      "won": 1,
-      "drawn": 0,
-      "lost": 0,
-      "goalsFor": 2,
-      "goalsAgainst": 1,
-      "goalDifference": 1,
-      "points": 3,
-      "position": 3
-    },
-    {
       "team": "LOS PLEBES Tk",
       "played": 1,
       "won": 1,
@@ -188,7 +191,7 @@
       "goalsAgainst": 0,
       "goalDifference": 1,
       "points": 3,
-      "position": 4
+      "position": 3
     },
     {
       "team": "Tiki Taka FC",
@@ -200,7 +203,7 @@
       "goalsAgainst": 0,
       "goalDifference": 1,
       "points": 3,
-      "position": 5
+      "position": 4
     },
     {
       "team": "WEST SIDE PTY",
@@ -212,18 +215,30 @@
       "goalsAgainst": 0,
       "goalDifference": 1,
       "points": 3,
+      "position": 5
+    },
+    {
+      "team": "FC WEST SIDE",
+      "played": 1,
+      "won": 0,
+      "drawn": 1,
+      "lost": 0,
+      "goalsFor": null,
+      "goalsAgainst": null,
+      "goalDifference": null,
+      "points": 1,
       "position": 6
     },
     {
       "team": "Punta Coco FC",
       "played": 1,
       "won": 0,
-      "drawn": 0,
-      "lost": 1,
-      "goalsFor": 1,
-      "goalsAgainst": 2,
-      "goalDifference": -1,
-      "points": 0,
+      "drawn": 1,
+      "lost": 0,
+      "goalsFor": null,
+      "goalsAgainst": null,
+      "goalDifference": null,
+      "points": 1,
       "position": 7
     },
     {
@@ -307,92 +322,7 @@
       }
     ]
   },
-  "bracket": {
-    "format": "8",
-    "teams": [
-      "Coiner FC",
-      "BKS FC",
-      "FC WEST SIDE",
-      "LOS PLEBES Tk",
-      "Tiki Taka FC",
-      "WEST SIDE PTY",
-      "Punta Coco FC",
-      "Rayos X FC"
-    ],
-    "matches": [
-      {
-        "id": "match_1",
-        "round": 1,
-        "roundName": "Cuartos de Final",
-        "homeTeam": "Coiner FC",
-        "awayTeam": "Rayos X FC",
-        "homeScore": 3,
-        "awayScore": 0,
-        "status": "finished"
-      },
-      {
-        "id": "match_2",
-        "round": 1,
-        "roundName": "Cuartos de Final",
-        "homeTeam": "BKS FC",
-        "awayTeam": "Punta Coco FC",
-        "homeScore": 3,
-        "awayScore": 0,
-        "status": "finished"
-      },
-      {
-        "id": "match_3",
-        "round": 1,
-        "roundName": "Cuartos de Final",
-        "homeTeam": "FC WEST SIDE",
-        "awayTeam": "WEST SIDE PTY",
-        "homeScore": 3,
-        "awayScore": 4,
-        "status": "finished"
-      },
-      {
-        "id": "match_4",
-        "round": 1,
-        "roundName": "Cuartos de Final",
-        "homeTeam": "LOS PLEBES Tk",
-        "awayTeam": "Tiki Taka FC",
-        "homeScore": 4,
-        "awayScore": 3,
-        "status": "finished"
-      },
-      {
-        "id": "match_5",
-        "round": 2,
-        "roundName": "Semifinales",
-        "homeTeam": "Coiner FC",
-        "awayTeam": "BKS FC",
-        "homeScore": null,
-        "awayScore": null,
-        "status": "pending"
-      },
-      {
-        "id": "match_6",
-        "round": 2,
-        "roundName": "Semifinales",
-        "homeTeam": "WEST SIDE PTY",
-        "awayTeam": "LOS PLEBES Tk",
-        "homeScore": null,
-        "awayScore": null,
-        "status": "pending"
-      },
-      {
-        "id": "match_7",
-        "round": 3,
-        "roundName": "Final",
-        "homeTeam": "Ganador Match 5",
-        "awayTeam": "Ganador Match 6",
-        "homeScore": null,
-        "awayScore": null,
-        "status": "pending"
-      }
-    ],
-    "createdAt": "2025-07-31T18:13:51.402Z"
-  },
+  "bracket": null,
   "clubs": [
     {
       "id": 1,
