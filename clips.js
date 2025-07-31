@@ -5,6 +5,7 @@ let isLoading = false;
 let statsInterval;
 let lastStatsUpdate = 0;
 let isServerAvailable = false;
+let teamsData = []; // Equipos dinámicos del backend
 
 // DOM Elements
 const uploadModal = document.getElementById('uploadModal');
@@ -20,6 +21,10 @@ const filterBtns = document.querySelectorAll('.filter-btn');
 document.addEventListener('DOMContentLoaded', () => {
     // Check server availability
     checkServerAvailability();
+    
+    // Load teams data
+    loadTeamsData();
+    
     loadClips();
     loadStats();
     setupEventListeners();
@@ -30,6 +35,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Initialize navigation
     initializeNavigation();
+    
+    // Setup WebSocket for real-time team updates
+    setupTeamsWebSocket();
 });
 
 // Check server availability
@@ -47,6 +55,144 @@ async function checkServerAvailability() {
         console.log('🔴 Servidor no disponible, usando modo offline');
         isServerAvailable = false;
         resetStatsIfNeeded();
+    }
+}
+
+// Load teams data from backend
+async function loadTeamsData() {
+    try {
+        console.log('👥 Cargando equipos desde el backend...');
+        const response = await fetch('/api/teams');
+        if (response.ok) {
+            teamsData = await response.json();
+            console.log('✅ Equipos cargados para clips:', teamsData.length);
+            
+            // Actualizar filtros y formulario con los nuevos equipos
+            updateTeamFilters();
+            updateTeamSelect();
+        } else {
+            console.warn('⚠️ No se pudieron cargar los equipos del backend');
+            teamsData = getFallbackTeams();
+            updateTeamFilters();
+            updateTeamSelect();
+        }
+    } catch (error) {
+        console.error('❌ Error cargando equipos:', error);
+        teamsData = getFallbackTeams();
+        updateTeamFilters();
+        updateTeamSelect();
+    }
+}
+
+// Equipos por defecto como fallback
+function getFallbackTeams() {
+    return [
+        { name: 'ACP 507' },
+        { name: 'BKS FC' },
+        { name: 'Coiner FC' },
+        { name: 'FC WEST SIDE' },
+        { name: 'Humacao FC' },
+        { name: 'Jumpers FC' },
+        { name: 'LOS PLEBES Tk' },
+        { name: 'Pura Vibra' },
+        { name: 'Rayos X FC' },
+        { name: 'Tiki Taka FC' },
+        { name: 'WEST SIDE PTY' }
+    ];
+}
+
+// Actualizar filtros de equipos dinámicamente
+function updateTeamFilters() {
+    const clubFiltersContainer = document.querySelector('[data-club-filter="all"]')?.parentElement;
+    if (!clubFiltersContainer) return;
+    
+    // Mantener el botón "Todos"
+    const allButton = clubFiltersContainer.querySelector('[data-club-filter="all"]');
+    
+    // Limpiar filtros existentes excepto "Todos"
+    const existingFilters = clubFiltersContainer.querySelectorAll('[data-club-filter]:not([data-club-filter="all"])');
+    existingFilters.forEach(filter => filter.remove());
+    
+    // Agregar nuevos filtros de equipos
+    teamsData.forEach(team => {
+        const filterBtn = document.createElement('button');
+        filterBtn.className = 'filter-tag';
+        filterBtn.setAttribute('data-club-filter', team.name);
+        filterBtn.textContent = team.name;
+        
+        // Agregar event listener
+        filterBtn.addEventListener('click', () => {
+            const filter = team.name;
+            console.log('🔍 Filtro de club seleccionado:', filter);
+            
+            currentFilter = filter;
+            
+            // Update active button state
+            clubFiltersContainer.querySelectorAll('.filter-tag').forEach(b => b.classList.remove('active'));
+            filterBtn.classList.add('active');
+            
+            // Reset pagination and reload clips
+            currentPage = 1;
+            clipsGrid.innerHTML = '';
+            loadClips();
+        });
+        
+        clubFiltersContainer.appendChild(filterBtn);
+    });
+    
+    console.log('✅ Filtros de equipos actualizados:', teamsData.length);
+}
+
+// Actualizar select de equipos en el formulario
+function updateTeamSelect() {
+    const clubSelect = document.getElementById('clubSelect');
+    if (!clubSelect) return;
+    
+    // Mantener la opción por defecto
+    const defaultOption = clubSelect.querySelector('option[value=""]');
+    
+    // Limpiar opciones existentes excepto la por defecto
+    const existingOptions = clubSelect.querySelectorAll('option:not([value=""])');
+    existingOptions.forEach(option => option.remove());
+    
+    // Agregar nuevas opciones de equipos
+    teamsData.forEach(team => {
+        const option = document.createElement('option');
+        option.value = team.name;
+        option.textContent = team.name;
+        clubSelect.appendChild(option);
+    });
+    
+    console.log('✅ Select de equipos actualizado:', teamsData.length);
+}
+
+// Configurar WebSocket para actualizaciones en tiempo real de equipos
+function setupTeamsWebSocket() {
+    try {
+        console.log('🔌 Configurando WebSocket para equipos...');
+        const socket = io();
+        
+        socket.on('connect', () => {
+            console.log('✅ WebSocket conectado para clips');
+        });
+        
+        socket.on('teamsUpdate', (updatedTeams) => {
+            console.log('👥 Actualizando equipos en clips...', updatedTeams.length);
+            teamsData = updatedTeams;
+            
+            // Actualizar filtros y formulario con los nuevos equipos
+            updateTeamFilters();
+            updateTeamSelect();
+            
+            showNotification('Lista de equipos actualizada', 'success');
+        });
+        
+        socket.on('disconnect', () => {
+            console.log('❌ WebSocket desconectado');
+        });
+        
+    } catch (error) {
+        console.error('❌ Error configurando WebSocket:', error);
     }
 }
 

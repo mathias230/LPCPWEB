@@ -137,6 +137,9 @@ function switchTab(tabId) {
         case 'playoffs':
             loadPlayoffsManagement();
             break;
+        case 'clips':
+            loadClipsManagement();
+            break;
     }
 }
 
@@ -692,10 +695,30 @@ function renderTeams() {
     teams.forEach(team => {
         const teamCard = document.createElement('div');
         teamCard.className = 'team-card';
+        
+        // Detectar si hay logo personalizado
+        const hasCustomLogo = team.logo && 
+                             team.logo !== 'img/default-team.png' && 
+                             team.logo !== 'undefined' && 
+                             team.logo !== 'null' && 
+                             team.logo !== '' && 
+                             typeof team.logo === 'string' && 
+                             team.logo.trim() !== '';
+        
+        const logoImg = hasCustomLogo ? 
+            `<img src="${team.logo}" alt="Logo ${team.name}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 8px; margin-right: 10px;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">` + 
+            `<div style="width: 50px; height: 50px; background: rgba(255,0,0,0.1); border: 2px dashed #ff0000; border-radius: 8px; display: none; align-items: center; justify-content: center; margin-right: 10px;"><i class="fas fa-exclamation-triangle" style="color: #ff0000;" title="Error cargando imagen"></i></div>` :
+            `<div style="width: 50px; height: 50px; background: rgba(0,255,136,0.1); border: 2px dashed #00ff88; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-right: 10px;"><i class="fas fa-image" style="color: #00ff88;"></i></div>`;
+        
         teamCard.innerHTML = `
-            <div class="team-name">${team.name}</div>
-            <div class="team-info">
-                <i class="fas fa-image"></i> ${team.logo || 'Sin logo'}
+            <div style="display: flex; align-items: center; margin-bottom: 15px;">
+                ${logoImg}
+                <div>
+                    <div class="team-name">${team.name}</div>
+                    <div style="color: rgba(255,255,255,0.6); font-size: 12px;">
+                        ${hasCustomLogo ? `Logo: ${team.logo.substring(0, 30)}...` : 'Logo por defecto'}
+                    </div>
+                </div>
             </div>
             <div class="team-actions">
                 <button class="btn btn-danger" onclick="deleteTeam(${team.id})">
@@ -711,23 +734,27 @@ async function handleTeamSubmit(e) {
     e.preventDefault();
     
     const formData = new FormData(e.target);
-    const teamData = {
-        name: formData.get('teamName').trim(),
-        logo: formData.get('teamLogo').trim() || 'img/default-team.png'
-    };
+    const teamName = formData.get('teamName').trim();
+    const logoFile = formData.get('teamLogo');
 
-    if (!teamData.name) {
+    if (!teamName) {
         showNotification('El nombre del equipo es requerido', 'error');
         return;
+    }
+
+    // Crear FormData para enviar archivo
+    const submitFormData = new FormData();
+    submitFormData.append('name', teamName);
+    
+    // Solo agregar el logo si se seleccionó un archivo
+    if (logoFile && logoFile.size > 0) {
+        submitFormData.append('logo', logoFile);
     }
 
     try {
         const response = await fetch('/api/teams', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(teamData)
+            body: submitFormData // No incluir Content-Type header para FormData
         });
 
         const result = await response.json();
@@ -1920,3 +1947,132 @@ window.updatePlayoffMatch = updatePlayoffMatch;
 window.clearPlayoffMatch = clearPlayoffMatch;
 window.editPlayerQuick = editPlayerQuick;
 window.deletePlayerQuick = deletePlayerQuick;
+window.deleteClip = deleteClip;
+
+// ==================== CLIPS MANAGEMENT ====================
+
+// Cargar gestión de clips
+async function loadClipsManagement() {
+    console.log('📹 Cargando gestión de clips...');
+    await loadAllClips();
+}
+
+// Cargar todos los clips
+async function loadAllClips() {
+    try {
+        // Obtener todos los clips sin paginación
+        const response = await fetch('/api/clips?page=1&limit=1000');
+        if (response.ok) {
+            const data = await response.json();
+            const clips = data.clips || []; // Extraer el array de clips
+            console.log('📹 Clips cargados:', clips.length);
+            renderClips(clips);
+        } else {
+            console.error('Error cargando clips:', response.status);
+            showNotification('Error cargando clips', 'error');
+        }
+    } catch (error) {
+        console.error('Error cargando clips:', error);
+        showNotification('Error de conexión al cargar clips', 'error');
+    }
+}
+
+// Renderizar clips en el admin
+function renderClips(clips) {
+    const clipsGrid = document.getElementById('clipsGrid');
+    if (!clipsGrid) return;
+
+    if (clips.length === 0) {
+        clipsGrid.innerHTML = `
+            <div style="text-align: center; color: rgba(255,255,255,0.7); padding: 40px;">
+                <i class="fas fa-video" style="font-size: 48px; margin-bottom: 20px; opacity: 0.3;"></i>
+                <p>No hay clips subidos aún</p>
+            </div>
+        `;
+        return;
+    }
+
+    clipsGrid.innerHTML = clips.map(clip => {
+        const uploadDate = new Date(clip.upload_date).toLocaleDateString('es-ES', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
+        // Usar video_url como fuente del video
+        const videoUrl = clip.video_url || clip.url || '#';
+
+        return `
+            <div class="clip-card">
+                <video class="clip-video" controls preload="metadata">
+                    <source src="${videoUrl}" type="video/mp4">
+                    Tu navegador no soporta el elemento video.
+                </video>
+                
+                <div class="clip-info">
+                    <div class="clip-title">${clip.title || 'Sin título'}</div>
+                    <div class="clip-meta">
+                        <i class="fas fa-calendar"></i> Subido: ${uploadDate}
+                    </div>
+                    <div class="clip-meta">
+                        <i class="fas fa-file"></i> ID: ${clip.id}
+                    </div>
+                    <div class="clip-meta">
+                        <i class="fas fa-tag"></i> Tipo: ${clip.type || 'N/A'}
+                    </div>
+                    <div class="clip-meta">
+                        <i class="fas fa-shield-alt"></i> Club: ${clip.club || 'N/A'}
+                    </div>
+                </div>
+                
+                <div class="clip-stats">
+                    <div class="clip-stat">
+                        <i class="fas fa-heart"></i> ${clip.likes || 0} likes
+                    </div>
+                    <div class="clip-stat">
+                        <i class="fas fa-eye"></i> ${clip.views || 0} vistas
+                    </div>
+                </div>
+                
+                <div class="clip-actions">
+                    <a href="/clips.html" target="_blank" class="btn-view">
+                        <i class="fas fa-external-link-alt"></i> Ver en página
+                    </a>
+                    <button class="btn-delete" onclick="deleteClip('${clip.id}')">
+                        <i class="fas fa-trash"></i> Eliminar
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// Eliminar clip
+async function deleteClip(clipId) {
+    if (!confirm('¿Estás seguro de que quieres eliminar este clip? Esta acción no se puede deshacer.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/clips/${clipId}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            showNotification('Clip eliminado exitosamente', 'success');
+            console.log('🗑️ Clip eliminado:', clipId);
+            
+            // Recargar clips
+            await loadAllClips();
+        } else {
+            const error = await response.json().catch(() => ({}));
+            showNotification(`Error eliminando clip: ${error.error || 'Error desconocido'}`, 'error');
+            console.error('Error eliminando clip:', error);
+        }
+    } catch (error) {
+        console.error('Error eliminando clip:', error);
+        showNotification('Error de conexión al eliminar clip', 'error');
+    }
+}

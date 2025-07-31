@@ -13,7 +13,7 @@ const server = http.createServer(app);
 const io = socketIo(server, {
     cors: {
         origin: "*",
-        methods: ["GET", "POST"]
+        methods: ["GET", "POST", "DELETE", "PUT"]
     }
 });
 
@@ -125,18 +125,18 @@ let currentBracket = null;
 
 // Equipos de la Liga Panameña de Clubes Pro
 let teams = [
-    { id: 1, name: 'ACP 507', founded: 2020, stadium: 'Estadio ACP' },
-    { id: 2, name: 'BKS FC', founded: 2023, stadium: 'BKS Stadium' },
-    { id: 3, name: 'Coiner FC', founded: 2019, stadium: 'Campo Coiner' },
-    { id: 4, name: 'FC WEST SIDE', founded: 2021, stadium: 'West Side Arena' },
-    { id: 5, name: 'Humacao FC', founded: 2020, stadium: 'Estadio Humacao' },
-    { id: 6, name: 'Jumpers FC', founded: 2022, stadium: 'Jumpers Arena' },
-    { id: 7, name: 'LOS PLEBES Tk', founded: 2021, stadium: 'Estadio Los Plebes' },
-    { id: 8, name: 'Punta Coco FC', founded: 2018, stadium: 'Punta Coco Field' },
-    { id: 9, name: 'Pura Vibra', founded: 2022, stadium: 'Vibra Stadium' },
-    { id: 10, name: 'Rayos X FC', founded: 2020, stadium: 'Rayos Stadium' },
-    { id: 11, name: 'Tiki Taka FC', founded: 2021, stadium: 'Tiki Taka Field' },
-    { id: 12, name: 'WEST SIDE PTY', founded: 2023, stadium: 'West Side Stadium' }
+    { id: 1, name: 'ACP 507', founded: 2020, stadium: 'Estadio ACP', logo: 'img/default-team.png' },
+    { id: 2, name: 'BKS FC', founded: 2023, stadium: 'BKS Stadium', logo: 'img/default-team.png' },
+    { id: 3, name: 'Coiner FC', founded: 2019, stadium: 'Campo Coiner', logo: 'img/default-team.png' },
+    { id: 4, name: 'FC WEST SIDE', founded: 2021, stadium: 'West Side Arena', logo: 'img/default-team.png' },
+    { id: 5, name: 'Humacao FC', founded: 2020, stadium: 'Estadio Humacao', logo: 'img/default-team.png' },
+    { id: 6, name: 'Jumpers FC', founded: 2022, stadium: 'Jumpers Arena', logo: 'img/default-team.png' },
+    { id: 7, name: 'LOS PLEBES Tk', founded: 2021, stadium: 'Estadio Los Plebes', logo: 'img/default-team.png' },
+    { id: 8, name: 'Punta Coco FC', founded: 2018, stadium: 'Punta Coco Field', logo: 'img/default-team.png' },
+    { id: 9, name: 'Pura Vibra', founded: 2022, stadium: 'Vibra Stadium', logo: 'img/default-team.png' },
+    { id: 10, name: 'Rayos X FC', founded: 2020, stadium: 'Rayos Stadium', logo: 'img/default-team.png' },
+    { id: 11, name: 'Tiki Taka FC', founded: 2021, stadium: 'Tiki Taka Field', logo: 'img/default-team.png' },
+    { id: 12, name: 'WEST SIDE PTY', founded: 2023, stadium: 'West Side Stadium', logo: 'img/default-team.png' }
 ];
 
 // Cargar datos existentes solo para clips
@@ -558,6 +558,62 @@ app.post('/api/clips/:id/view', (req, res) => {
     res.json({ success: true, views: clip.views });
 });
 
+// Eliminar clip (solo para administradores)
+app.delete('/api/clips/:id', async (req, res) => {
+    try {
+        const clipId = req.params.id;
+        const clipIndex = clips.findIndex(c => c.id === clipId);
+        
+        if (clipIndex === -1) {
+            return res.status(404).json({ success: false, error: 'Clip no encontrado' });
+        }
+        
+        const clip = clips[clipIndex];
+        console.log('🗑️ Eliminando clip:', clip.title, 'ID:', clipId);
+        
+        // Si el clip está en Cloudinary, intentar eliminarlo
+        if (clip.filename) {
+            try {
+                await cloudinary.uploader.destroy(clip.filename, { resource_type: 'video' });
+                console.log('✅ Clip eliminado de Cloudinary:', clip.filename);
+            } catch (cloudinaryError) {
+                console.warn('⚠️ Error eliminando de Cloudinary (continuando):', cloudinaryError.message);
+            }
+        }
+        
+        // Eliminar de la base de datos local
+        clips.splice(clipIndex, 1);
+        
+        // Actualizar estadísticas
+        stats.total_clips = clips.length;
+        stats.total_views = clips.reduce((sum, c) => sum + (c.views || 0), 0);
+        stats.total_likes = clips.reduce((sum, c) => sum + (c.likes || 0), 0);
+        
+        // Guardar cambios
+        saveData();
+        
+        // Notificar cambio en tiempo real
+        io.emit('clipDeleted', {
+            clipId: clipId,
+            stats: stats
+        });
+        
+        console.log('✅ Clip eliminado exitosamente:', clipId);
+        res.json({ 
+            success: true, 
+            message: 'Clip eliminado exitosamente',
+            stats: stats
+        });
+        
+    } catch (error) {
+        console.error('Error eliminando clip:', error);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Error interno del servidor: ' + error.message
+        });
+    }
+});
+
 // ===== RUTAS API PARA PANEL DE ADMINISTRACIÓN =====
 
 // Obtener clasificaciones
@@ -610,64 +666,7 @@ app.get('/api/standings', (req, res) => {
 app.get('/api/teams', (req, res) => {
     res.json(teams);
 });
-app.post('/api/teams', (req, res) => {
-    try {
-        const { name, logo } = req.body;
-        // Validar campos obligatorios
-    if (!name || !name.trim()) {
-        return res.status(400).json({ error: 'El nombre del equipo es obligatorio' });
-    }
-    
-    // Limpiar el nombre
-    const cleanName = name.trim();    
-        
-        // Verificar si el equipo ya existe
-        const existingTeam = teams.find(t => t.name.toLowerCase() === cleanName.toLowerCase());
-        if (existingTeam) {
-            return res.status(400).json({ error: 'El equipo ya existe' });
-        }
-        
-        const newTeam = {
-            id: Date.now(),
-            name: cleanName,
-            logo: logo || 'img/default-team.png'
-        };
-        
-        // También agregar a la tabla de posiciones con estadísticas iniciales
-        const tournamentTeam = {
-            id: `team_${Date.now()}`,
-            name: cleanName,
-            shortName: cleanName.substring(0, 3).toUpperCase(),
-            logo: logo || 'img/default-team.png',
-            coach: '',
-            stadium: '',
-            played: 0,
-            won: 0,
-            drawn: 0,
-            lost: 0,
-            goalsFor: 0,
-            goalsAgainst: 0,
-            goalDifference: 0,
-            points: 0
-        };
-        
-        teams.push(newTeam);
-        tournament.teams.push(tournamentTeam);
-        
-        // Recalcular tabla de posiciones
-        updateStandingsFromMatches();
-        saveData();
-        
-        // Emitir actualizaciones en tiempo real
-        io.emit('teamsUpdate', teams);
-        io.emit('standingsUpdate', standings);
-        
-        res.json({ success: true, team: newTeam });
-    } catch (error) {
-        console.error('Error agregando equipo:', error);
-        res.status(500).json({ error: 'Error interno del servidor' });
-    }
-});
+// Endpoint eliminado - se usa el que soporta subida de archivos más abajo
 
 // Eliminar equipo (solo admin)
 app.delete('/api/teams/:id', (req, res) => {
@@ -978,34 +977,75 @@ app.get('/api/teams/:id', (req, res) => {
 });
 
 // Crear un nuevo equipo
-app.post('/api/teams', upload.single('logo'), async (req, res) => {
+app.post('/api/teams', uploadImage.single('logo'), async (req, res) => {
     try {
-        const { name, shortName, coach, stadium } = req.body;
+        const { name } = req.body;
         
-        if (!name) {
-            return res.status(400).json({ error: 'El nombre del equipo es requerido' });
+        // Validar campos obligatorios
+        if (!name || !name.trim()) {
+            return res.status(400).json({ error: 'El nombre del equipo es obligatorio' });
         }
         
-        let logoUrl = '';
+        // Limpiar el nombre
+        const cleanName = name.trim();
         
-        // Subir logo a Cloudinary si se proporcionó
+        // Verificar si el equipo ya existe
+        const existingTeam = teams.find(t => t.name.toLowerCase() === cleanName.toLowerCase());
+        if (existingTeam) {
+            return res.status(400).json({ error: 'El equipo ya existe' });
+        }
+        
+        let logoUrl = 'img/default-team.png';
+        
+        // Subir logo a Cloudinary si se proporcionó y está configurado
         if (req.file) {
-            const result = await cloudinary.uploader.upload_stream(
-                { resource_type: 'auto', folder: 'lpcp/teams' },
-                (error, result) => {
-                    if (error) throw error;
+            try {
+                // Verificar si Cloudinary está configurado
+                if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) {
+                    const result = await new Promise((resolve, reject) => {
+                        cloudinary.uploader.upload_stream(
+                            { resource_type: 'auto', folder: 'lpcp/teams' },
+                            (error, result) => {
+                                if (error) reject(error);
+                                else resolve(result);
+                            }
+                        ).end(req.file.buffer);
+                    });
                     logoUrl = result.secure_url;
+                    console.log('✅ Logo subido a Cloudinary:', logoUrl);
+                } else {
+                    console.log('⚠️ Cloudinary no configurado, usando logo por defecto');
+                    // Guardar archivo localmente como fallback
+                    const fileName = `team_${Date.now()}_${req.file.originalname}`;
+                    const localPath = path.join(__dirname, 'uploads', fileName);
+                    fs.writeFileSync(localPath, req.file.buffer);
+                    logoUrl = `/uploads/${fileName}`;
+                    console.log('📁 Logo guardado localmente:', logoUrl);
                 }
-            ).end(req.file.buffer);
+            } catch (uploadError) {
+                console.error('❌ Error subiendo logo:', uploadError);
+                // Continuar con logo por defecto si falla la subida
+                logoUrl = 'img/default-team.png';
+            }
         }
         
+        const teamId = Date.now();
+        
+        // Crear equipo para el array teams
         const newTeam = {
-            id: `team_${Date.now()}`,
-            name,
-            shortName: shortName || name.substring(0, 3).toUpperCase(),
+            id: teamId,
+            name: cleanName,
+            logo: logoUrl
+        };
+        
+        // Crear equipo para la tabla de posiciones
+        const tournamentTeam = {
+            id: `team_${teamId}`,
+            name: cleanName,
+            shortName: cleanName.substring(0, 3).toUpperCase(),
             logo: logoUrl,
-            coach: coach || '',
-            stadium: stadium || '',
+            coach: '',
+            stadium: '',
             played: 0,
             won: 0,
             drawn: 0,
@@ -1016,16 +1056,34 @@ app.post('/api/teams', upload.single('logo'), async (req, res) => {
             points: 0
         };
         
-        tournament.teams.push(newTeam);
+        // Agregar a ambos arrays
+        teams.push(newTeam);
+        tournament.teams.push(tournamentTeam);
+        
+        // También crear automáticamente como club
+        const newClub = {
+            id: `club_${teamId}`,
+            name: cleanName,
+            description: `Club de fútbol ${cleanName}`,
+            founded: new Date().getFullYear(),
+            players: 0,
+            logo: logoUrl
+        };
+        clubs.push(newClub);
+        
+        // Recalcular tabla de posiciones
+        updateStandingsFromMatches();
         saveData();
         
-        // Emitir actualización a todos los clientes
-        io.emit('teamsUpdate', tournament.teams);
+        // Emitir actualizaciones en tiempo real
+        io.emit('teamsUpdate', teams);
+        io.emit('standingsUpdate', standings);
+        io.emit('clubsUpdate', clubs);
         
-        res.status(201).json(newTeam);
+        res.json({ success: true, team: newTeam });
     } catch (error) {
-        console.error('Error al crear equipo:', error);
-        res.status(500).json({ error: 'Error al crear el equipo' });
+        console.error('Error agregando equipo:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
     }
 });
 
@@ -1249,9 +1307,26 @@ app.post('/api/players', uploadImage.single('playerPhoto'), async (req, res) => 
             }
         }
         
-        // Obtener nombre del club
-        const club = clubs.find(c => c.id === clubId) || tournament.teams.find(t => t.id === clubId);
+        // Obtener nombre del club - Convertir clubId a número para comparación correcta
+        const numericClubId = parseInt(clubId);
+        
+        console.log('🔍 Datos de búsqueda:', {
+            clubId: clubId,
+            numericClubId: numericClubId,
+            clubIdType: typeof clubId,
+            numericClubIdType: typeof numericClubId,
+            clubsCount: clubs.length,
+            teamsCount: teams.length,
+            clubsIds: clubs.map(c => ({ id: c.id, name: c.name, idType: typeof c.id })),
+            teamsIds: teams.map(t => ({ id: t.id, name: t.name, idType: typeof t.id }))
+        });
+        
+        // Buscar usando tanto el valor original como el convertido a número
+        const club = clubs.find(c => c.id === clubId || c.id === numericClubId) || 
+                    teams.find(t => t.id === clubId || t.id === numericClubId);
         const clubName = club ? club.name : 'Equipo desconocido';
+        
+        console.log('🔍 Resultado de búsqueda:', { clubId, clubFound: !!club, clubName });
         
         const newPlayer = {
             id: Date.now(),
@@ -2138,6 +2213,16 @@ app.get('/clips.html', (req, res) => {
 });
 
 app.get('/admin.html', (req, res) => {
+    // Redirigir a login para autenticación
+    res.redirect('/login.html');
+});
+
+app.get('/login.html', (req, res) => {
+    res.sendFile(path.join(__dirname, 'login.html'));
+});
+
+// Ruta protegida para el admin (solo accesible después de login)
+app.get('/admin-panel.html', (req, res) => {
     res.sendFile(path.join(__dirname, 'admin.html'));
 });
 

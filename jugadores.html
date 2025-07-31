@@ -75,6 +75,10 @@
             transition: all 0.3s ease;
             position: relative;
             overflow: hidden;
+            min-width: 180px;
+            max-width: 400px;
+            width: auto;
+            flex: 0 0 auto;
         }
 
         .player-card::before {
@@ -298,9 +302,13 @@
             </div>
             <ul class="nav-menu">
                 <li class="nav-item"><a href="index.html" class="nav-link">Inicio</a></li>
-                <li class="nav-item"><a href="standings.html" class="nav-link">Torneo</a></li>
+                <li class="nav-item"><a href="index.html#liga" class="nav-link">La Liga</a></li>
+                <li class="nav-item"><a href="index.html#clubes" class="nav-link">Clubes</a></li>
+                <li class="nav-item"><a href="index.html#temporada" class="nav-link">Temporada</a></li>
                 <li class="nav-item"><a href="clips.html" class="nav-link">Clips</a></li>
                 <li class="nav-item"><a href="jugadores.html" class="nav-link active">Jugadores</a></li>
+                <li class="nav-item"><a href="standings.html" class="nav-link">Posiciones</a></li>
+                <li class="nav-item"><a href="index.html#contacto" class="nav-link">Contacto</a></li>
             </ul>
             <div class="hamburger">
                 <span class="bar"></span>
@@ -345,6 +353,7 @@
         </div>
     </div>
 
+    <script src="/socket.io/socket.io.js"></script>
     <script src="jugadores.js"></script>
 </body>
 </html>

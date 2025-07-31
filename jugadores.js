@@ -56,9 +56,9 @@ function initializeWebSocket() {
             renderPlayers();
         });
         
-        socket.on('clubsUpdate', (updatedClubs) => {
-            console.log('🔄 Actualización de clubes recibida');
-            allClubs = updatedClubs;
+        socket.on('teamsUpdate', (updatedTeams) => {
+            console.log('🔄 Actualización de equipos recibida');
+            allClubs = updatedTeams;
             renderClubSelector();
             if (currentClubId !== 'all') {
                 updateClubInfo();
@@ -107,14 +107,15 @@ async function loadPlayers() {
 
 async function loadClubs() {
     try {
-        const response = await fetch('/api/clubs');
-        if (!response.ok) throw new Error('Error fetching clubs');
+        // Cargar equipos desde /api/teams para sincronización correcta
+        const response = await fetch('/api/teams');
+        if (!response.ok) throw new Error('Error fetching teams');
         
         allClubs = await response.json();
-        console.log('✅ Clubes cargados:', allClubs.length);
+        console.log('✅ Equipos cargados para jugadores:', allClubs.length);
         
     } catch (error) {
-        console.error('Error loading clubs:', error);
+        console.error('Error loading teams:', error);
         allClubs = [];
         throw error;
     }

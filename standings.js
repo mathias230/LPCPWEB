@@ -45,10 +45,12 @@ function setupWebSocket() {
     
     socket.on('teamsUpdate', (updatedTeams) => {
         console.log('👥 Actualizando equipos...');
-        // Actualizar datos de equipos y regenerar tabla de posiciones
-        console.log('📊 Regenerando tabla de posiciones con nuevos equipos...');
+        // Actualizar datos de equipos directamente
+        teamsData = updatedTeams;
+        console.log('✅ Equipos actualizados:', teamsData.length);
         
-        // Recargar datos de la tabla de posiciones para incluir nuevos equipos
+        // Regenerar tabla de posiciones con nuevos equipos
+        console.log('📊 Regenerando tabla de posiciones con nuevos equipos...');
         loadStandingsData();
         
         // Si estamos viendo la tabla, actualizarla inmediatamente
@@ -89,6 +91,7 @@ let fixturesData = [];
 let resultsData = [];
 let classificationZones = [];
 let tournamentSettings = {};
+let teamsData = []; // Equipos dinámicos del backend
 
 // Función para obtener el número máximo de jornadas dinámicamente
 function getMaxMatchdays() {
@@ -104,21 +107,40 @@ function getMaxMatchdays() {
     return maxMatchdays;
 }
 
-// Teams data with logos - Updated to match actual file names
-const teams = [
-    { name: 'ACP 507', logo: 'img/APC 507.png' },
-    { name: 'BKS FC', logo: 'img/BKS FC.jpg' },
-    { name: 'Coiner FC', logo: 'img/Coiner FC.jpg' },
-    { name: 'FC WEST SIDE', logo: 'img/West side.jpg' },
-    { name: 'Humacao FC', logo: 'img/Humacao fc.jpg' },
-    { name: 'Jumpers FC', logo: 'img/Jumpers FC.jpg' },
-    { name: 'LOS PLEBES Tk', logo: 'img/Los Plebes.jpg' },
-    { name: 'Punta Coco FC', logo: 'img/Punta Coco FC.png' },
-    { name: 'Pura Vibra', logo: 'img/Pura vibra.png' },
-    { name: 'Rayos X FC', logo: 'img/Rayos x FC.jpg' },
-    { name: 'Tiki Taka FC', logo: 'img/Tiki taka FC.jpg' },
-    { name: 'WEST SIDE PTY', logo: 'img/WEST SIDE PTY.jpg' }
-];
+// Función para cargar equipos dinámicamente del backend
+async function loadTeamsData() {
+    try {
+        console.log('👥 Cargando datos de equipos desde el backend...');
+        const response = await fetch('/api/teams');
+        if (response.ok) {
+            teamsData = await response.json();
+            console.log('✅ Equipos cargados:', teamsData.length);
+        } else {
+            console.warn('⚠️ No se pudieron cargar los equipos del backend, usando datos por defecto');
+            teamsData = generateFallbackTeams();
+        }
+    } catch (error) {
+        console.error('❌ Error cargando equipos:', error);
+        teamsData = generateFallbackTeams();
+    }
+}
+
+// Equipos por defecto como fallback
+function generateFallbackTeams() {
+    return [
+        { name: 'ACP 507', logo: 'img/APC 507.png' },
+        { name: 'BKS FC', logo: 'img/BKS FC.jpg' },
+        { name: 'Coiner FC', logo: 'img/Coiner FC.jpg' },
+        { name: 'FC WEST SIDE', logo: 'img/West side.jpg' },
+        { name: 'Humacao FC', logo: 'img/Humacao fc.jpg' },
+        { name: 'Jumpers FC', logo: 'img/Jumpers FC.jpg' },
+        { name: 'LOS PLEBES Tk', logo: 'img/Los Plebes.jpg' },
+        { name: 'Pura Vibra', logo: 'img/Pura vibra.png' },
+        { name: 'Rayos X FC', logo: 'img/Rayos x FC.jpg' },
+        { name: 'Tiki Taka FC', logo: 'img/Tiki taka FC.jpg' },
+        { name: 'WEST SIDE PTY', logo: 'img/WEST SIDE PTY.jpg' }
+    ];
+}
 
 function initializeStandings() {
     // Initialize typewriter effect
@@ -220,14 +242,20 @@ async function loadAllData() {
     console.log('📊 Cargando todos los datos...');
     
     try {
-        // Cargar configuración del torneo y zonas de clasificación
+        // Cargar configuración del torneo
         await loadTournamentSettings();
         
-        // Cargar datos de clasificación
+        // Cargar equipos dinámicamente
+        await loadTeamsData();
+        
+        // Cargar datos de la tabla de posiciones
         await loadStandingsData();
         
         // Cargar datos de partidos
         await loadMatchesData();
+        
+        // Actualizar información de temporada
+        updateSeasonInfo();
         
         console.log('✅ Todos los datos cargados exitosamente');
         
@@ -243,6 +271,7 @@ async function loadAllData() {
         console.log('🔄 Usando datos de respaldo...');
         standingsData = generateFallbackStandings();
         fixturesData = generateSampleFixtures();
+        teamsData = generateFallbackTeams();
         
         // Usar zonas de clasificación por defecto
         classificationZones = [
@@ -362,8 +391,10 @@ async function loadMatchesData() {
 
 // Fallback standings if server is unavailable
 function generateFallbackStandings() {
-    // Usamos el array global 'teams' que ya contiene los 12 equipos
-    return teams.map((team, index) => ({
+    // Si no hay datos de equipos, usar datos de fallback
+    const fallbackTeams = teamsData.length > 0 ? teamsData : generateFallbackTeams();
+    
+    return fallbackTeams.map((team, index) => ({
         position: index + 1,
         team: team.name, // Solo guardamos el nombre del equipo, no el objeto completo
         played: 0,       // Partidos jugados
@@ -495,21 +526,21 @@ function loadStandingsTable() {
         // Asegurarse de que teamData.team sea un string y no un objeto
         const teamName = typeof teamData.team === 'object' ? teamData.team.name : teamData.team;
         
-        // Encontrar el equipo en el array de equipos para obtener el logo
-        const teamInfo = teams.find(t => t.name === teamName) || { 
+        // Encontrar el equipo en los datos dinámicos para obtener el logo
+        const teamInfo = teamsData.find(t => t.name === teamName) || { 
             name: teamName, 
-            logo: 'img/teams/default.png' 
+            logo: 'img/default-team.png' 
         };
         
         // Si el logo no se encuentra, usar una imagen por defecto
-        const logoPath = teamInfo.logo || 'img/teams/default.png';
+        const logoPath = teamInfo.logo || 'img/default-team.png';
         
         return `
         <tr class="${getPositionClass(teamData.position)}">
             <td class="position">${teamData.position}</td>
             <td class="team">
                 <div class="team-info">
-                    <img src="${logoPath}" alt="${teamInfo.name}" class="team-logo" onerror="this.onerror=null; this.src='img/teams/default.png'">
+                    <img src="${logoPath}" alt="${teamInfo.name}" class="team-logo" onerror="this.onerror=null; this.src='img/default-team.png'">
                     <span class="team-name">${teamInfo.name}</span>
                 </div>
             </td>

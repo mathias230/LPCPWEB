@@ -194,6 +194,35 @@
         }
 
         /* Clubs Section Styles */
+        .teams-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .team-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(0, 255, 136, 0.2);
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .team-card:hover {
+            border-color: #00ff88;
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 255, 136, 0.2);
+        }
+
+        .team-name {
+            color: #00ff88;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
         .clubs-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -471,6 +500,114 @@
             padding: 5px 12px;
             border-radius: 15px;
         }
+
+        /* Clips Management Styles */
+        .clips-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .clip-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(0, 255, 136, 0.2);
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .clip-card:hover {
+            border-color: #00ff88;
+            transform: translateY(-5px);
+        }
+
+        .clip-video {
+            width: 100%;
+            height: 200px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            background: #000;
+        }
+
+        .clip-info {
+            margin-bottom: 15px;
+        }
+
+        .clip-title {
+            color: #00ff88;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            word-break: break-word;
+        }
+
+        .clip-meta {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+
+        .clip-stats {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+
+        .clip-stat {
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .clip-stat i {
+            color: #00ff88;
+            margin-right: 5px;
+        }
+
+        .clip-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .btn-delete {
+            background: linear-gradient(45deg, #ff4757, #ff3838);
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .btn-delete:hover {
+            background: linear-gradient(45deg, #ff3838, #ff2828);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 71, 87, 0.4);
+        }
+
+        .btn-view {
+            background: rgba(0, 255, 136, 0.1);
+            color: #00ff88;
+            border: 2px solid #00ff88;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-view:hover {
+            background: #00ff88;
+            color: #0a0a0a;
+            transform: translateY(-2px);
+        }
     </style>
 </head>
 <body>
@@ -489,6 +626,7 @@
                 <li><a href="clips.html" class="nav-link">Clips</a></li>
                 <li><a href="jugadores.html" class="nav-link">Jugadores</a></li>
                 <li><a href="admin.html" class="nav-link active">Admin</a></li>
+                <li><a href="#" onclick="logout()" class="nav-link" style="color: #ff4757;"><i class="fas fa-sign-out-alt"></i> Salir</a></li>
             </ul>
             <div class="hamburger">
                 <span class="bar"></span>
@@ -527,6 +665,9 @@
             <button class="admin-tab-btn" data-tab="playoffs">
                 <i class="fas fa-medal"></i> Playoffs
             </button>
+            <button class="admin-tab-btn" data-tab="clips">
+                <i class="fas fa-video"></i> Clips
+            </button>
         </div>
 
         <!-- Teams Section -->
@@ -539,8 +680,9 @@
                     <input type="text" id="teamName" name="teamName" required>
                 </div>
                 <div class="form-group">
-                    <label for="teamLogo">Logo del Equipo (URL)</label>
-                    <input type="text" id="teamLogo" name="teamLogo" placeholder="img/equipo.png">
+                    <label for="teamLogo">Logo del Equipo</label>
+                    <input type="file" id="teamLogo" name="teamLogo" accept="image/*">
+                    <small style="color: rgba(255,255,255,0.6);">Formatos soportados: JPG, PNG, GIF</small>
                 </div>
                 <button type="submit" class="btn">
                     <i class="fas fa-plus"></i> Agregar Equipo
@@ -788,6 +930,20 @@
                 </div>
             </div>
         </div>
+
+        <!-- Clips Section -->
+        <div class="admin-section" id="clips">
+            <h2><i class="fas fa-video"></i> Gestión de Clips</h2>
+            <p style="color: rgba(255,255,255,0.7); margin-bottom: 30px;">Modera los clips subidos por los usuarios. Puedes eliminar contenido ofensivo o inapropiado.</p>
+            
+            <!-- Clips Grid -->
+            <div class="clips-grid" id="clipsGrid">
+                <div class="loading" style="text-align: center; color: rgba(255,255,255,0.7); padding: 40px;">
+                    <i class="fas fa-spinner fa-spin" style="font-size: 24px; margin-bottom: 10px;"></i>
+                    <p>Cargando clips...</p>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Notification -->
@@ -795,6 +951,54 @@
 
     <!-- Socket.IO for real-time updates -->
     <script src="/socket.io/socket.io.js"></script>
+    
+    <!-- Authentication Check -->
+    <script>
+        // Verificar autenticación antes de cargar el admin
+        function checkAuthentication() {
+            const isAuthenticated = localStorage.getItem('adminAuthenticated');
+            const loginTime = localStorage.getItem('adminLoginTime');
+            
+            if (!isAuthenticated || isAuthenticated !== 'true') {
+                window.location.href = 'login.html';
+                return false;
+            }
+            
+            // Verificar si la sesión ha expirado (24 horas)
+            if (loginTime) {
+                const currentTime = Date.now();
+                const sessionDuration = 24 * 60 * 60 * 1000; // 24 horas
+                
+                if (currentTime - parseInt(loginTime) > sessionDuration) {
+                    localStorage.removeItem('adminAuthenticated');
+                    localStorage.removeItem('adminLoginTime');
+                    window.location.href = 'login.html';
+                    return false;
+                }
+            }
+            
+            return true;
+        }
+        
+        // Ejecutar verificación inmediatamente
+        if (!checkAuthentication()) {
+            // Si no está autenticado, detener la carga del resto del script
+            throw new Error('No autenticado');
+        }
+        
+        // Función para cerrar sesión
+        function logout() {
+            if (confirm('¿Estás seguro de que quieres cerrar sesión?')) {
+                localStorage.removeItem('adminAuthenticated');
+                localStorage.removeItem('adminLoginTime');
+                window.location.href = 'login.html';
+            }
+        }
+        
+        // Hacer la función logout disponible globalmente
+        window.logout = logout;
+    </script>
+    
     <script src="admin.js"></script>
 </body>
 </html>
