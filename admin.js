@@ -2865,6 +2865,83 @@ window.addClassificationZone = addClassificationZone;
 window.saveTableConfig = saveTableConfig;
 window.saveTournamentConfig = saveTournamentConfig;
 
+// ============ LIMPIEZA DE JUGADORES HUÉRFANOS ============
+
+// Función para limpiar jugadores de equipos eliminados
+async function cleanOrphanedPlayers() {
+    try {
+        console.log('🧹 Iniciando limpieza de jugadores huérfanos...');
+        
+        // Obtener equipos actuales
+        const teamsResponse = await fetch('/api/teams');
+        if (!teamsResponse.ok) throw new Error('Error obteniendo equipos');
+        const currentTeams = await teamsResponse.json();
+        
+        // Obtener todos los jugadores
+        const playersResponse = await fetch('/api/players');
+        if (!playersResponse.ok) throw new Error('Error obteniendo jugadores');
+        const allPlayers = await playersResponse.json();
+        
+        // Encontrar IDs de equipos que existen
+        const validTeamIds = currentTeams.map(team => team.id);
+        console.log('📊 Equipos válidos:', validTeamIds);
+        
+        // Encontrar jugadores huérfanos
+        const orphanedPlayers = allPlayers.filter(player => 
+            !validTeamIds.includes(player.clubId)
+        );
+        
+        console.log(`👥 Jugadores huérfanos encontrados: ${orphanedPlayers.length}`);
+        
+        if (orphanedPlayers.length === 0) {
+            showNotification('No se encontraron jugadores huérfanos', 'success');
+            return;
+        }
+        
+        // Mostrar confirmación
+        const playerNames = orphanedPlayers.map(p => p.name).join(', ');
+        const confirmed = confirm(`¿Eliminar ${orphanedPlayers.length} jugadores huérfanos?\n\nJugadores: ${playerNames}`);
+        
+        if (!confirmed) {
+            showNotification('Limpieza cancelada', 'info');
+            return;
+        }
+        
+        // Eliminar jugadores huérfanos
+        let deletedCount = 0;
+        for (const player of orphanedPlayers) {
+            try {
+                const deleteResponse = await fetch(`/api/players/${player.id}`, {
+                    method: 'DELETE'
+                });
+                
+                if (deleteResponse.ok) {
+                    deletedCount++;
+                    console.log(`✅ Jugador eliminado: ${player.name}`);
+                } else {
+                    console.error(`❌ Error eliminando jugador: ${player.name}`);
+                }
+            } catch (error) {
+                console.error(`❌ Error eliminando jugador ${player.name}:`, error);
+            }
+        }
+        
+        showNotification(`Limpieza completada: ${deletedCount} jugadores eliminados`, 'success');
+        
+        // Recargar la sección de jugadores
+        if (selectedTeamId) {
+            loadTeamPlayers(selectedTeamId);
+        }
+        
+    } catch (error) {
+        console.error('❌ Error en limpieza de jugadores huérfanos:', error);
+        showNotification('Error en la limpieza: ' + error.message, 'error');
+    }
+}
+
+// Exponer la función globalmente
+window.cleanOrphanedPlayers = cleanOrphanedPlayers;
+
 // ============ VERIFICACIÓN OCR DE LISTAS DE JUGADORES ============
 
 // Inicializar verificación OCR
