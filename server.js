@@ -92,6 +92,10 @@ let stats = {
     total_likes: 0
 };
 
+// VARIABLES CRÍTICAS - DEBEN ESTAR ANTES DE loadTournamentData()
+let players = []; // Jugadores de la liga
+let clubs = [];   // Clubes de la liga
+
 // Tabla de posiciones dinámica (se genera automáticamente basada en equipos y partidos)
 let standings = [];
 
@@ -1478,11 +1482,8 @@ app.delete('/api/teams/:id', async (req, res) => {
 
 // ==================== CLUBS API ====================
 
-// Variable global para almacenar clubes
-let clubs = [];
-
-// Variable global para almacenar jugadores
-let players = [];
+// Variables movidas al inicio del archivo para evitar problemas de inicialización
+// (Ver líneas ~95 donde se declaran players y clubs)
 
 // FUNCIÓN ELIMINADA: initializeClubs() - Equipos y clubes son ahora completamente independientes
 
