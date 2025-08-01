@@ -290,42 +290,67 @@ function switchTab(tabId) {
 
 async function loadAllData() {
     console.log('📥 Cargando todos los datos...');
+    
+    // Mostrar indicador de carga
+    showLoadingIndicator();
+    
+    try {
+        // Cargar configuración del torneo (síncrono, rápido)
+        loadTournamentSettings();
         
-    // Cargar configuración del torneo
-    loadTournamentSettings();
+        console.log('⏳ Cargando datos principales...');
         
-    // Cargar equipos
-    loadTeamsData().then(() => {
-        // Una vez cargados los equipos, cargar la tabla de posiciones
-        loadStandingsData();
-            
-        // Cargar partidos
-        loadMatchesData().then(() => {
-            // Actualizar la jornada máxima basada en los partidos cargados
-            getMaxMatchdays();
-                
-            // Cargar estadísticas de jugadores para el apartado rápido
-            loadQuickPlayerStats().then(() => {
-                // Cargar la pestaña activa
-                const activeTab = document.querySelector('.tab-btn.active');
-                if (activeTab) {
-                    const tabId = activeTab.getAttribute('data-tab');
-                    switchTab(tabId);
-                } else {
-                    // Por defecto mostrar la tabla de posiciones
-                    switchTab('table');
-                }
-            });
-        });
-    }).catch(error => {
-        console.error('❌ Error cargando datos:', error);
-            
-        // Usar datos de respaldo
-        console.log('🔄 Usando datos de respaldo...');
+        // Cargar datos principales en paralelo para mayor velocidad
+        const [teamsResult, standingsResult, matchesResult] = await Promise.allSettled([
+            retryAsync(() => loadTeamsData(), 3, 1000),
+            retryAsync(() => loadStandingsData(), 3, 1000),
+            retryAsync(() => loadMatchesData(), 3, 1000)
+        ]);
+        
+        // Verificar resultados y usar fallbacks si es necesario
+        if (teamsResult.status === 'rejected') {
+            console.warn('⚠️ Error cargando equipos, usando fallback');
+            teamsData = generateFallbackTeams();
+        }
+        
+        if (standingsResult.status === 'rejected') {
+            console.warn('⚠️ Error cargando posiciones, usando fallback');
+            standingsData = generateFallbackStandings();
+        }
+        
+        if (matchesResult.status === 'rejected') {
+            console.warn('⚠️ Error cargando partidos, usando fallback');
+            fixturesData = generateSampleFixtures();
+        }
+        
+        // Actualizar jornadas máximas basado en partidos
+        getMaxMatchdays();
+        
+        console.log('📊 Cargando estadísticas de jugadores...');
+        
+        // Cargar estadísticas (opcional, no bloquea la UI)
+        try {
+            // Usar la función de estadísticas que realmente existe
+            await retryAsync(() => loadMainStatistics(), 2, 500);
+        } catch (error) {
+            console.warn('⚠️ Error cargando estadísticas de jugadores:', error.message);
+            // Las estadísticas son opcionales, no afectan la funcionalidad principal
+        }
+        
+        console.log('✅ Todos los datos cargados exitosamente');
+        
+    } catch (error) {
+        console.error('❌ Error crítico cargando datos:', error);
+        
+        // Usar todos los datos de respaldo
+        console.log('🔄 Usando todos los datos de respaldo...');
         standingsData = generateFallbackStandings();
         fixturesData = generateSampleFixtures();
         teamsData = generateFallbackTeams();
-            
+    } finally {
+        // Ocultar indicador de carga
+        hideLoadingIndicator();
+        
         // Cargar la pestaña activa
         const activeTab = document.querySelector('.tab-btn.active');
         if (activeTab) {
@@ -335,7 +360,121 @@ async function loadAllData() {
             // Por defecto mostrar la tabla de posiciones
             switchTab('table');
         }
-    });
+        
+        console.log('🎯 Página de posiciones lista para usar');
+    }
+}
+
+// ============ FUNCIONES AUXILIARES DE OPTIMIZACIÓN ============
+
+// Función para reintentar operaciones asíncronas automáticamente
+async function retryAsync(fn, retries = 3, delay = 1000) {
+    for (let i = 0; i < retries; i++) {
+        try {
+            const result = await fn();
+            return result;
+        } catch (error) {
+            console.warn(`⚠️ Intento ${i + 1}/${retries} falló:`, error.message);
+            
+            if (i === retries - 1) {
+                throw error; // Último intento, lanzar error
+            }
+            
+            // Esperar antes del siguiente intento
+            await new Promise(resolve => setTimeout(resolve, delay));
+        }
+    }
+}
+
+// Mostrar indicador de carga global
+function showLoadingIndicator() {
+    // Crear indicador si no existe
+    let indicator = document.getElementById('global-loading-indicator');
+    if (!indicator) {
+        indicator = document.createElement('div');
+        indicator.id = 'global-loading-indicator';
+        indicator.innerHTML = `
+            <div class="loading-overlay">
+                <div class="loading-spinner"></div>
+                <div class="loading-text">Cargando datos...</div>
+            </div>
+        `;
+        indicator.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            backdrop-filter: blur(3px);
+        `;
+        
+        // Estilos para el contenido
+        const style = document.createElement('style');
+        style.textContent = `
+            .loading-overlay {
+                text-align: center;
+                color: white;
+                font-family: 'Roboto', sans-serif;
+            }
+            .loading-spinner {
+                width: 50px;
+                height: 50px;
+                border: 4px solid rgba(255, 255, 255, 0.3);
+                border-top: 4px solid #00ff88;
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+                margin: 0 auto 20px;
+            }
+            .loading-text {
+                font-size: 18px;
+                font-weight: 500;
+            }
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+        `;
+        document.head.appendChild(style);
+        document.body.appendChild(indicator);
+    }
+    
+    indicator.style.display = 'flex';
+    console.log('🔄 Indicador de carga mostrado');
+}
+
+// Ocultar indicador de carga global
+function hideLoadingIndicator() {
+    const indicator = document.getElementById('global-loading-indicator');
+    if (indicator) {
+        indicator.style.display = 'none';
+        console.log('✅ Indicador de carga ocultado');
+    }
+}
+
+// Función para hacer las llamadas API más robustas con timeout
+async function fetchWithTimeout(url, options = {}, timeout = 5000) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    
+    try {
+        const response = await fetch(url, {
+            ...options,
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        return response;
+    } catch (error) {
+        clearTimeout(timeoutId);
+        if (error.name === 'AbortError') {
+            throw new Error(`Timeout: La petición a ${url} tardó más de ${timeout}ms`);
+        }
+        throw error;
+    }
 }
 
 // Cargar configuración del torneo
@@ -372,34 +511,68 @@ async function loadTournamentSettings() {
 
 async function loadStandingsData() {
     try {
-        const response = await fetch('/api/standings');
+        console.log('📊 Cargando datos de posiciones...');
+        const response = await fetchWithTimeout('/api/standings', {}, 3000);
+        
         if (!response.ok) {
-            throw new Error('Error en la respuesta del servidor');
+            throw new Error(`Error ${response.status}: ${response.statusText}`);
         }
         
         const data = await response.json();
-        console.log('✅ Datos de posiciones cargados desde el servidor:', data);
-        standingsData = data;
+        console.log('✅ Datos de posiciones cargados exitosamente:', data?.length || 0, 'equipos');
+        standingsData = data || [];
+        
+        return data;
         
     } catch (error) {
-        console.error('❌ Error cargando datos del servidor:', error);
-        console.log('🔄 Usando datos de respaldo...');
+        console.error('❌ Error cargando posiciones:', error.message);
         
         // Usar datos de respaldo si el servidor no está disponible
         standingsData = generateFallbackStandings();
-        showNotification('Usando datos de ejemplo - Servidor no disponible', 'info');
+        console.log('🔄 Usando datos de posiciones de respaldo');
+        
+        throw error; // Re-lanzar para que retryAsync pueda manejarlo
+    }
+}
+
+// Función para cargar equipos desde el backend
+async function loadTeamsData() {
+    try {
+        console.log('👥 Cargando datos de equipos...');
+        const response = await fetchWithTimeout('/api/teams', {}, 3000);
+        
+        if (!response.ok) {
+            throw new Error(`Error ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log('✅ Datos de equipos cargados exitosamente:', data?.length || 0, 'equipos');
+        teamsData = data || [];
+        
+        return data;
+        
+    } catch (error) {
+        console.error('❌ Error cargando equipos:', error.message);
+        
+        // Usar datos de respaldo si el servidor no está disponible
+        teamsData = generateFallbackTeams();
+        console.log('🔄 Usando datos de equipos de respaldo');
+        
+        throw error; // Re-lanzar para que retryAsync pueda manejarlo
     }
 }
 
 async function loadMatchesData() {
     try {
-        const response = await fetch('/api/tournament/matches');
+        console.log('⚽ Cargando datos de partidos...');
+        const response = await fetchWithTimeout('/api/tournament/matches', {}, 4000);
+        
         if (!response.ok) {
-            throw new Error('Error en la respuesta del servidor');
+            throw new Error(`Error ${response.status}: ${response.statusText}`);
         }
         
         const data = await response.json();
-        console.log('✅ Datos de partidos cargados desde el servidor:', data);
+        console.log('✅ Datos de partidos cargados exitosamente:', data?.length || 0, 'partidos');
         
         if (data && data.length > 0) {
             // Separar partidos por estado: programados vs terminados
@@ -427,8 +600,10 @@ async function loadMatchesData() {
         // Actualizar jornadas máximas dinámicamente
         getMaxMatchdays();
         
+        return data;
+        
     } catch (error) {
-        console.error('❌ Error cargando partidos del servidor:', error);
+        console.error('❌ Error cargando partidos:', error.message);
         console.log('🔄 Generando datos de partidos de ejemplo...');
         const sampleData = generateSampleFixtures();
         fixturesData = sampleData;
@@ -436,6 +611,8 @@ async function loadMatchesData() {
         
         // Actualizar jornadas máximas dinámicamente
         getMaxMatchdays();
+        
+        throw error; // Re-lanzar para que retryAsync pueda manejarlo
     }
 }
 
