@@ -278,6 +278,11 @@ loadTournamentData();
 
 // Función para guardar datos localmente y hacer backup en Cloudinary
 function saveData() {
+    return saveDataAsync();
+}
+
+// Función interna async para manejar el guardado
+async function saveDataAsync() {
     try {
         console.log('🔄 INICIANDO GUARDADO DE DATOS...');
         console.log('📊 Estado actual de arrays:');
@@ -324,10 +329,14 @@ function saveData() {
         console.log(`   - players en archivo: ${savedData.players ? savedData.players.length : 'undefined'}`);
         console.log(`   - clips en archivo: ${savedData.clips ? savedData.clips.length : 'undefined'}`);
         
-        // Backup asíncrono en Cloudinary (no bloquea la ejecución)
-        backupToCloudinary(tournamentData).catch(error => {
+        // Backup síncrono en Cloudinary para garantizar persistencia
+        console.log('☁️ Iniciando backup en Cloudinary...');
+        try {
+            await backupToCloudinary(tournamentData);
+            console.log('✅ Backup en Cloudinary completado exitosamente');
+        } catch (error) {
             console.warn('⚠️ Error en backup de Cloudinary:', error.message);
-        });
+        }
         
         console.log('✅ GUARDADO COMPLETADO EXITOSAMENTE');
     } catch (error) {
