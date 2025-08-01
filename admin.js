@@ -162,6 +162,9 @@ function switchTab(tabId) {
         case 'clips':
             loadClipsManagement();
             break;
+        case 'ocr-verify':
+            initializeOCRVerification();
+            break;
     }
 }
 
@@ -615,7 +618,8 @@ async function addPlayerQuick() {
         }
         
         const newPlayer = await response.json();
-        players.push(newPlayer);
+        // No agregar manualmente - el WebSocket se encarga de la actualización
+        // players.push(newPlayer); // Removido para evitar duplicación
         loadTeamPlayers(selectedTeamId);
         
         quickInput.value = '';
@@ -1750,6 +1754,157 @@ async function createManualBracket() {
     await createBracket(selectedTeams, format);
 }
 
+// Mostrar interfaz de emparejamientos personalizados
+function showCustomPairings() {
+    const format = document.getElementById('bracketFormat').value;
+    const numTeams = parseInt(format);
+    const numMatches = numTeams / 2;
+    
+    const customPairingsDiv = document.getElementById('customPairings');
+    const pairingsInputsDiv = document.getElementById('pairingsInputs');
+    
+    // Ocultar otras secciones
+    document.getElementById('manualSelection').style.display = 'none';
+    
+    // Generar inputs para cada emparejamiento
+    let inputsHTML = '';
+    for (let i = 0; i < numMatches; i++) {
+        inputsHTML += `
+            <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; border: 1px solid rgba(255,165,0,0.3);">
+                <label style="color: #ff6b35; font-weight: 600; margin-bottom: 8px; display: block;">
+                    <i class="fas fa-vs"></i> Partido ${i + 1}
+                </label>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <input type="number" id="home_${i}" min="1" max="${numTeams}" placeholder="Pos." 
+                           style="width: 60px; padding: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,165,0,0.5); border-radius: 4px; color: white; text-align: center;">
+                    <span style="color: #ff6b35; font-weight: bold;">vs</span>
+                    <input type="number" id="away_${i}" min="1" max="${numTeams}" placeholder="Pos." 
+                           style="width: 60px; padding: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,165,0,0.5); border-radius: 4px; color: white; text-align: center;">
+                    <small style="color: rgba(255,255,255,0.6); margin-left: 10px;">Posiciones en la tabla</small>
+                </div>
+            </div>
+        `;
+    }
+    
+    pairingsInputsDiv.innerHTML = inputsHTML;
+    customPairingsDiv.style.display = 'block';
+}
+
+// Ocultar interfaz de emparejamientos personalizados
+function hideCustomPairings() {
+    document.getElementById('customPairings').style.display = 'none';
+}
+
+// Crear emparejamientos personalizados desde los inputs del usuario
+function createCustomPairings(teams) {
+    const format = document.getElementById('bracketFormat').value;
+    const numTeams = parseInt(format);
+    const numMatches = numTeams / 2;
+    const customPairings = [];
+    
+    for (let i = 0; i < numMatches; i++) {
+        const homePos = parseInt(document.getElementById(`home_${i}`).value);
+        const awayPos = parseInt(document.getElementById(`away_${i}`).value);
+        
+        if (isNaN(homePos) || isNaN(awayPos) || homePos < 1 || homePos > numTeams || awayPos < 1 || awayPos > numTeams) {
+            throw new Error(`Partido ${i + 1}: Posiciones inválidas. Deben ser números entre 1 y ${numTeams}`);
+        }
+        
+        if (homePos === awayPos) {
+            throw new Error(`Partido ${i + 1}: Un equipo no puede jugar contra sí mismo`);
+        }
+        
+        customPairings.push({
+            home: teams[homePos - 1], // -1 porque los arrays empiezan en 0
+            away: teams[awayPos - 1]
+        });
+    }
+    
+    // Verificar que no haya equipos duplicados
+    const usedTeams = new Set();
+    customPairings.forEach((pairing, index) => {
+        if (usedTeams.has(pairing.home)) {
+            throw new Error(`El equipo en posición ${teams.indexOf(pairing.home) + 1} aparece más de una vez`);
+        }
+        if (usedTeams.has(pairing.away)) {
+            throw new Error(`El equipo en posición ${teams.indexOf(pairing.away) + 1} aparece más de una vez`);
+        }
+        usedTeams.add(pairing.home);
+        usedTeams.add(pairing.away);
+    });
+    
+    console.log('🎯 Emparejamientos personalizados creados:', customPairings);
+    return customPairings;
+}
+
+// Función para crear bracket con emparejamientos personalizados
+async function createCustomBracket() {
+    const format = document.getElementById('bracketFormat').value;
+    const numTeams = parseInt(format);
+    
+    try {
+        // Obtener tabla de posiciones actual (igual que generateBracket)
+        const response = await fetch('/api/standings');
+        if (!response.ok) throw new Error('Error fetching standings');
+        
+        const standings = await response.json();
+        
+        // Tomar los primeros N equipos según el formato
+        const qualifiedTeams = standings.slice(0, numTeams).map(team => team.team);
+        
+        if (qualifiedTeams.length < numTeams) {
+            showNotification(`Se necesitan al menos ${numTeams} equipos en la tabla`, 'error');
+            return;
+        }
+        
+        // Verificar si la interfaz de emparejamientos personalizados está activa
+        const customPairingsDiv = document.getElementById('customPairings');
+        if (!customPairingsDiv || customPairingsDiv.style.display === 'none') {
+            showNotification('Primero debes configurar los emparejamientos personalizados', 'error');
+            return;
+        }
+        
+        // Crear emparejamientos personalizados
+        let customPairings;
+        try {
+            customPairings = createCustomPairings(qualifiedTeams);
+        } catch (pairingError) {
+            showNotification('Error en emparejamientos: ' + pairingError.message, 'error');
+            return;
+        }
+        
+        const bracket = {
+            format: format,
+            teams: qualifiedTeams,
+            matches: generateBracketMatches(qualifiedTeams, format, customPairings),
+            createdAt: new Date().toISOString()
+        };
+        
+        const bracketResponse = await fetch('/api/playoffs/bracket', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(bracket)
+        });
+        
+        if (bracketResponse.ok) {
+            currentBracket = bracket;
+            renderBracket(bracket);
+            showNotification('Bracket personalizado creado exitosamente', 'success');
+            
+            // Ocultar selección manual
+            document.getElementById('manualSelection').style.display = 'none';
+        } else {
+            showNotification('Error creando bracket personalizado', 'error');
+        }
+        
+    } catch (error) {
+        console.error('Error creating custom bracket:', error);
+        showNotification('Error generando bracket personalizado', 'error');
+    }
+}
+
 async function createBracket(teams, format) {
     const bracket = {
         format: format,
@@ -1783,7 +1938,7 @@ async function createBracket(teams, format) {
     }
 }
 
-function generateBracketMatches(teams, format) {
+function generateBracketMatches(teams, format, customPairings = null) {
     const matches = [];
     const numTeams = parseInt(format);
     let matchId = 1;
@@ -1791,12 +1946,24 @@ function generateBracketMatches(teams, format) {
     if (numTeams === 16) {
         // OCTAVOS DE FINAL (16 equipos = 8 partidos)
         for (let i = 0; i < 8; i++) {
+            let homeTeam, awayTeam;
+            
+            if (customPairings && customPairings.length === 8) {
+                // Usar emparejamientos personalizados
+                homeTeam = customPairings[i].home;
+                awayTeam = customPairings[i].away;
+            } else {
+                // Usar emparejamientos automáticos (1vs16, 2vs15, etc.)
+                homeTeam = teams[i];
+                awayTeam = teams[15 - i];
+            }
+            
             matches.push({
                 id: `match_${matchId++}`,
                 round: 1,
                 roundName: 'Octavos de Final',
-                homeTeam: teams[i],
-                awayTeam: teams[15 - i],
+                homeTeam: homeTeam,
+                awayTeam: awayTeam,
                 homeScore: null,
                 awayScore: null,
                 status: 'pending'
@@ -2698,8 +2865,364 @@ window.addClassificationZone = addClassificationZone;
 window.saveTableConfig = saveTableConfig;
 window.saveTournamentConfig = saveTournamentConfig;
 
+// ============ VERIFICACIÓN OCR DE LISTAS DE JUGADORES ============
+
+// Inicializar verificación OCR
+function initializeOCRVerification() {
+    const matchSelect = document.getElementById('matchSelect');
+    const photoInput = document.getElementById('playerListPhoto');
+    const verifyBtn = document.getElementById('verifyBtn');
+    
+    if (matchSelect) {
+        loadMatchesForVerification();
+    }
+    
+    if (photoInput) {
+        photoInput.addEventListener('change', function() {
+            const hasMatch = matchSelect && matchSelect.value;
+            const hasPhoto = this.files && this.files.length > 0;
+            
+            if (verifyBtn) {
+                verifyBtn.disabled = !(hasMatch && hasPhoto);
+            }
+        });
+    }
+    
+    if (matchSelect) {
+        matchSelect.addEventListener('change', function() {
+            const hasMatch = this.value;
+            const hasPhoto = photoInput && photoInput.files && photoInput.files.length > 0;
+            
+            if (verifyBtn) {
+                verifyBtn.disabled = !(hasMatch && hasPhoto);
+            }
+        });
+    }
+}
+
+// Cargar partidos para verificación
+async function loadMatchesForVerification() {
+    try {
+        const response = await fetch('/api/matches');
+        if (response.ok) {
+            const matches = await response.json();
+            const matchSelect = document.getElementById('matchSelect');
+            
+            if (matchSelect) {
+                matchSelect.innerHTML = '<option value="">Seleccionar partido jugado...</option>';
+                
+                // Solo mostrar partidos con resultados (jugados)
+                const playedMatches = matches.filter(match => 
+                    match.homeScore !== null && match.awayScore !== null
+                );
+                
+                playedMatches.forEach(match => {
+                    const option = document.createElement('option');
+                    option.value = match.id;
+                    option.textContent = `${match.homeTeam} vs ${match.awayTeam} (${match.date})`;
+                    matchSelect.appendChild(option);
+                });
+            }
+        }
+    } catch (error) {
+        console.error('Error cargando partidos:', error);
+    }
+}
+
+// Función principal de verificación OCR
+window.verifyPlayerList = async function() {
+    const matchSelect = document.getElementById('matchSelect');
+    const photoInput = document.getElementById('playerListPhoto');
+    const statusDiv = document.getElementById('ocrStatus');
+    const resultsDiv = document.getElementById('verificationResults');
+    const verifyBtn = document.getElementById('verifyBtn');
+    
+    if (!matchSelect.value || !photoInput.files[0]) {
+        showNotification('Por favor selecciona un partido y sube una foto', 'error');
+        return;
+    }
+    
+    const matchId = matchSelect.value;
+    const imageFile = photoInput.files[0];
+    
+    try {
+        // Mostrar estado de procesamiento
+        statusDiv.style.display = 'block';
+        resultsDiv.style.display = 'none';
+        verifyBtn.disabled = true;
+        
+        console.log('🤖 Iniciando verificación OCR...');
+        
+        // Procesar imagen con Tesseract.js
+        const { data: { text } } = await Tesseract.recognize(imageFile, 'spa', {
+            logger: m => {
+                if (m.status === 'recognizing text') {
+                    const progress = Math.round(m.progress * 100);
+                    statusDiv.innerHTML = `
+                        <div style="color: #00ff88; font-size: 16px;">
+                            <i class="fas fa-spinner fa-spin"></i> Procesando imagen... ${progress}%
+                        </div>
+                        <div style="color: rgba(255,255,255,0.7); font-size: 14px; margin-top: 5px;">Extrayendo texto de la imagen</div>
+                    `;
+                }
+            }
+        });
+        
+        console.log('✅ Texto extraído:', text);
+        
+        // Procesar nombres detectados
+        const detectedNames = parsePlayerNames(text);
+        console.log('📝 Nombres detectados:', detectedNames);
+        
+        // Obtener jugadores registrados del partido
+        const registeredPlayers = await getRegisteredPlayersForMatch(matchId);
+        console.log('📊 Jugadores registrados:', registeredPlayers);
+        
+        // Comparar nombres
+        const verification = comparePlayerNames(detectedNames, registeredPlayers);
+        
+        // Mostrar resultados
+        displayVerificationResults(verification, detectedNames, registeredPlayers);
+        
+        // Limpiar imagen (como solicitó el usuario)
+        photoInput.value = '';
+        
+        showNotification('Verificación completada exitosamente', 'success');
+        
+    } catch (error) {
+        console.error('Error en verificación OCR:', error);
+        showNotification('Error procesando la imagen', 'error');
+    } finally {
+        // Ocultar estado de procesamiento
+        statusDiv.style.display = 'none';
+        verifyBtn.disabled = false;
+    }
+};
+
+// Procesar nombres de la lista extraída
+function parsePlayerNames(text) {
+    const lines = text.split('\n');
+    const names = [];
+    
+    lines.forEach(line => {
+        // Limpiar línea: remover números, guiones, puntos, etc.
+        const cleanLine = line
+            .replace(/^\d+\.?\s*|-\s*|•\s*/g, '') // Remover numeración
+            .replace(/[^a-zA-ZÀ-ÿ\s]/g, '') // Solo letras y espacios
+            .trim();
+        
+        // Solo agregar si parece un nombre (más de 2 caracteres, contiene espacios)
+        if (cleanLine.length > 2 && cleanLine.includes(' ')) {
+            names.push(cleanLine);
+        }
+    });
+    
+    return names;
+}
+
+// Obtener jugadores registrados para un partido
+async function getRegisteredPlayersForMatch(matchId) {
+    try {
+        // Obtener información del partido
+        const matchResponse = await fetch('/api/matches');
+        const matches = await matchResponse.json();
+        const match = matches.find(m => m.id == matchId);
+        
+        if (!match) {
+            throw new Error('Partido no encontrado');
+        }
+        
+        // Obtener jugadores de ambos equipos
+        const playersResponse = await fetch('/api/players');
+        const allPlayers = await playersResponse.json();
+        
+        // Obtener equipos del partido
+        const teamsResponse = await fetch('/api/teams');
+        const teams = await teamsResponse.json();
+        
+        const homeTeam = teams.find(t => t.name === match.homeTeam);
+        const awayTeam = teams.find(t => t.name === match.awayTeam);
+        
+        if (!homeTeam || !awayTeam) {
+            throw new Error('Equipos del partido no encontrados');
+        }
+        
+        // Filtrar jugadores de ambos equipos
+        const matchPlayers = allPlayers.filter(player => 
+            player.clubId === homeTeam.id || player.clubId === awayTeam.id
+        );
+        
+        console.log(`📋 Jugadores registrados para verificación:`);
+        console.log(`🏠 ${match.homeTeam}: ${matchPlayers.filter(p => p.clubId === homeTeam.id).map(p => p.name).join(', ')}`);
+        console.log(`🚌 ${match.awayTeam}: ${matchPlayers.filter(p => p.clubId === awayTeam.id).map(p => p.name).join(', ')}`);
+        console.log(`📊 Total jugadores registrados: ${matchPlayers.length}`);
+        
+        return matchPlayers;
+        
+    } catch (error) {
+        console.error('Error obteniendo jugadores del partido:', error);
+        return [];
+    }
+}
+
+// Comparar nombres detectados vs registrados
+function comparePlayerNames(detectedNames, registeredPlayers) {
+    const registeredNames = registeredPlayers.map(p => p.name.toLowerCase());
+    const validPlayers = [];
+    const invalidPlayers = [];
+    const warnings = [];
+    
+    detectedNames.forEach(detectedName => {
+        const lowerDetected = detectedName.toLowerCase();
+        
+        // Buscar coincidencia exacta
+        const exactMatch = registeredNames.find(regName => regName === lowerDetected);
+        
+        if (exactMatch) {
+            validPlayers.push(detectedName);
+        } else {
+            // Buscar coincidencia parcial (por si hay errores de OCR)
+            const partialMatch = registeredNames.find(regName => {
+                const similarity = calculateSimilarity(lowerDetected, regName);
+                return similarity > 0.7; // 70% de similitud
+            });
+            
+            if (partialMatch) {
+                validPlayers.push(detectedName);
+                warnings.push(`"${detectedName}" parece ser "${registeredPlayers.find(p => p.name.toLowerCase() === partialMatch).name}" (verificar OCR)`);
+            } else {
+                invalidPlayers.push(detectedName);
+            }
+        }
+    });
+    
+    return {
+        validPlayers,
+        invalidPlayers,
+        warnings,
+        totalDetected: detectedNames.length,
+        totalRegistered: registeredPlayers.length
+    };
+}
+
+// Calcular similitud entre dos strings
+function calculateSimilarity(str1, str2) {
+    const longer = str1.length > str2.length ? str1 : str2;
+    const shorter = str1.length > str2.length ? str2 : str1;
+    
+    if (longer.length === 0) return 1.0;
+    
+    const editDistance = levenshteinDistance(longer, shorter);
+    return (longer.length - editDistance) / longer.length;
+}
+
+// Calcular distancia de Levenshtein
+function levenshteinDistance(str1, str2) {
+    const matrix = [];
+    
+    for (let i = 0; i <= str2.length; i++) {
+        matrix[i] = [i];
+    }
+    
+    for (let j = 0; j <= str1.length; j++) {
+        matrix[0][j] = j;
+    }
+    
+    for (let i = 1; i <= str2.length; i++) {
+        for (let j = 1; j <= str1.length; j++) {
+            if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+                matrix[i][j] = matrix[i - 1][j - 1];
+            } else {
+                matrix[i][j] = Math.min(
+                    matrix[i - 1][j - 1] + 1,
+                    matrix[i][j - 1] + 1,
+                    matrix[i - 1][j] + 1
+                );
+            }
+        }
+    }
+    
+    return matrix[str2.length][str1.length];
+}
+
+// Mostrar resultados de verificación
+function displayVerificationResults(verification, detectedNames, registeredPlayers) {
+    const resultsDiv = document.getElementById('verificationResults');
+    
+    const html = `
+        <div style="background: rgba(255, 255, 255, 0.05); border-radius: 15px; padding: 25px;">
+            <h3 style="color: #00ff88; margin-bottom: 20px; text-align: center;">
+                <i class="fas fa-clipboard-check"></i> Reporte de Verificación
+            </h3>
+            
+            <!-- Resumen -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px;">
+                <div style="background: rgba(0, 255, 136, 0.1); padding: 15px; border-radius: 10px; text-align: center;">
+                    <div style="color: #00ff88; font-size: 24px; font-weight: bold;">${verification.totalDetected}</div>
+                    <div style="color: rgba(255,255,255,0.8); font-size: 14px;">Jugadores Detectados</div>
+                </div>
+                <div style="background: rgba(0, 255, 136, 0.1); padding: 15px; border-radius: 10px; text-align: center;">
+                    <div style="color: #00ff88; font-size: 24px; font-weight: bold;">${verification.validPlayers.length}</div>
+                    <div style="color: rgba(255,255,255,0.8); font-size: 14px;">Registrados</div>
+                </div>
+                <div style="background: rgba(255, 75, 87, 0.1); padding: 15px; border-radius: 10px; text-align: center;">
+                    <div style="color: #ff4757; font-size: 24px; font-weight: bold;">${verification.invalidPlayers.length}</div>
+                    <div style="color: rgba(255,255,255,0.8); font-size: 14px;">NO Registrados</div>
+                </div>
+            </div>
+            
+            ${verification.validPlayers.length > 0 ? `
+                <div style="margin-bottom: 20px;">
+                    <h4 style="color: #00ff88; margin-bottom: 10px;">
+                        <i class="fas fa-check-circle"></i> Jugadores Registrados (${verification.validPlayers.length})
+                    </h4>
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                        ${verification.validPlayers.map(name => 
+                            `<span style="background: rgba(0, 255, 136, 0.2); color: #00ff88; padding: 5px 12px; border-radius: 15px; font-size: 14px;">${name}</span>`
+                        ).join('')}
+                    </div>
+                </div>
+            ` : ''}
+            
+            ${verification.invalidPlayers.length > 0 ? `
+                <div style="margin-bottom: 20px;">
+                    <h4 style="color: #ff4757; margin-bottom: 10px;">
+                        <i class="fas fa-exclamation-triangle"></i> Jugadores NO Registrados (${verification.invalidPlayers.length})
+                    </h4>
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                        ${verification.invalidPlayers.map(name => 
+                            `<span style="background: rgba(255, 75, 87, 0.2); color: #ff4757; padding: 5px 12px; border-radius: 15px; font-size: 14px;">${name}</span>`
+                        ).join('')}
+                    </div>
+                </div>
+            ` : ''}
+            
+            ${verification.warnings.length > 0 ? `
+                <div style="margin-bottom: 20px;">
+                    <h4 style="color: #ffa500; margin-bottom: 10px;">
+                        <i class="fas fa-exclamation-circle"></i> Advertencias (${verification.warnings.length})
+                    </h4>
+                    ${verification.warnings.map(warning => 
+                        `<div style="background: rgba(255, 165, 0, 0.1); color: #ffa500; padding: 10px; border-radius: 8px; margin-bottom: 5px; font-size: 14px;">${warning}</div>`
+                    ).join('')}
+                </div>
+            ` : ''}
+            
+            <div style="text-align: center; margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1);">
+                <small style="color: rgba(255,255,255,0.6);">La imagen ha sido eliminada automáticamente por seguridad</small>
+            </div>
+        </div>
+    `;
+    
+    resultsDiv.innerHTML = html;
+    resultsDiv.style.display = 'block';
+}
+
 // Funciones de playoffs
 window.generateBracket = generateBracket;
+window.createCustomBracket = createCustomBracket;
+window.showCustomPairings = showCustomPairings;
+window.hideCustomPairings = hideCustomPairings;
 window.saveBracketResult = saveBracketResult;
 
 // Funciones de navegación

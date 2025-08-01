@@ -668,6 +668,9 @@
             <button class="admin-tab-btn" data-tab="clips">
                 <i class="fas fa-video"></i> Clips
             </button>
+            <button class="admin-tab-btn" data-tab="ocr-verify">
+                <i class="fas fa-search"></i> Verificar Lista
+            </button>
         </div>
 
         <!-- Teams Section -->
@@ -906,6 +909,10 @@
                         <i class="fas fa-magic"></i> Generar Automáticamente
                     </button>
                     
+                    <button class="btn" onclick="showCustomPairings()" style="background: linear-gradient(45deg, #ff6b35, #f7931e);">
+                        <i class="fas fa-cogs"></i> Emparejamientos Personalizados
+                    </button>
+                    
                     <button class="btn" onclick="showManualSelection()">
                         <i class="fas fa-hand-pointer"></i> Selección Manual
                     </button>
@@ -919,6 +926,25 @@
                     <button class="btn" onclick="createManualBracket()" style="margin-top: 15px;">
                         <i class="fas fa-check"></i> Crear Bracket
                     </button>
+                </div>
+                
+                <!-- Custom Pairings Section -->
+                <div id="customPairings" style="display: none; margin-top: 20px; background: rgba(255, 165, 0, 0.1); padding: 20px; border-radius: 12px; border: 2px solid rgba(255, 165, 0, 0.3);">
+                    <h4 style="color: #ff6b35; margin-bottom: 15px;"><i class="fas fa-cogs"></i> Emparejamientos Personalizados</h4>
+                    <p style="color: rgba(255,255,255,0.8); margin-bottom: 20px; font-size: 14px;">Escribe las posiciones de la tabla para cada emparejamiento (ej: 1 vs 8, 2 vs 7, etc.)</p>
+                    
+                    <div id="pairingsInputs" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px;">
+                        <!-- Pairing inputs will be generated here -->
+                    </div>
+                    
+                    <div style="margin-top: 20px; text-align: center;">
+                        <button class="btn" onclick="createCustomBracket()" style="background: linear-gradient(45deg, #ff6b35, #f7931e);">
+                            <i class="fas fa-magic"></i> Crear Bracket Personalizado
+                        </button>
+                        <button class="btn" onclick="hideCustomPairings()" style="background: rgba(255,255,255,0.1); margin-left: 10px;">
+                            <i class="fas fa-times"></i> Cancelar
+                        </button>
+                    </div>
                 </div>
             </div>
             
@@ -944,6 +970,51 @@
                 </div>
             </div>
         </div>
+        <!-- OCR Verification Section -->
+        <div class="admin-section" id="ocr-verify">
+            <h2><i class="fas fa-search"></i> Verificación de Lista de Jugadores</h2>
+            <p style="color: rgba(255,255,255,0.7); margin-bottom: 20px;">Sube una foto de la lista de jugadores para verificar si todos están registrados</p>
+            
+            <div style="background: rgba(0, 255, 136, 0.05); border: 2px solid rgba(0, 255, 136, 0.2); border-radius: 15px; padding: 25px; margin-bottom: 30px;">
+                <!-- Selección de partido -->
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label for="matchSelect" style="color: #00ff88; font-weight: 600; margin-bottom: 10px; display: block;">
+                        <i class="fas fa-futbol"></i> Seleccionar Partido
+                    </label>
+                    <select id="matchSelect" style="width: 100%; padding: 12px; background: rgba(255,255,255,0.1); border: 2px solid rgba(0,255,136,0.3); border-radius: 8px; color: white; font-size: 16px;">
+                        <option value="">Seleccionar partido jugado...</option>
+                    </select>
+                </div>
+                
+                <!-- Subida de foto -->
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label for="playerListPhoto" style="color: #00ff88; font-weight: 600; margin-bottom: 10px; display: block;">
+                        <i class="fas fa-camera"></i> Foto de Lista de Jugadores
+                    </label>
+                    <input type="file" id="playerListPhoto" accept="image/*" style="width: 100%; padding: 12px; background: rgba(255,255,255,0.1); border: 2px solid rgba(0,255,136,0.3); border-radius: 8px; color: white;">
+                    <small style="color: rgba(255,255,255,0.6); margin-top: 5px; display: block;">Formatos soportados: JPG, PNG. La imagen se borrará automáticamente después del procesamiento.</small>
+                </div>
+                
+                <!-- Botón de verificación -->
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <button onclick="verifyPlayerList()" class="btn" style="background: linear-gradient(45deg, #00ff88, #00cc6a); padding: 12px 30px; font-size: 16px;" disabled id="verifyBtn">
+                        <i class="fas fa-robot"></i> Verificar con IA
+                    </button>
+                </div>
+                
+                <!-- Estado de procesamiento -->
+                <div id="ocrStatus" style="display: none; text-align: center; margin-bottom: 20px;">
+                    <div style="color: #00ff88; font-size: 16px;">
+                        <i class="fas fa-spinner fa-spin"></i> Procesando imagen con IA...
+                    </div>
+                    <div style="color: rgba(255,255,255,0.7); font-size: 14px; margin-top: 5px;">Esto puede tomar unos segundos</div>
+                </div>
+            </div>
+            
+            <!-- Resultados de verificación -->
+            <div id="verificationResults" style="display: none;"></div>
+        </div>
+
     </div>
 
     <!-- Notification -->
@@ -951,6 +1022,9 @@
 
     <!-- Socket.IO for real-time updates -->
     <script src="/socket.io/socket.io.js"></script>
+    
+    <!-- Tesseract.js for OCR functionality -->
+    <script src="https://unpkg.com/tesseract.js@v4.1.1/dist/tesseract.min.js"></script>
     
     <!-- Authentication Check -->
     <script>

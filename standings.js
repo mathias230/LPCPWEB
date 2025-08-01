@@ -95,6 +95,9 @@ function setupWebSocket() {
         // Si estamos en la pestaña de estadísticas, recargar tablas principales
         if (document.querySelector('#stats.active')) {
             loadStats();
+        } else {
+            // Si no estamos en la pestaña de estadísticas, al menos actualizar el resumen
+            updateStatsSummary(updatedPlayers);
         }
     });
     
@@ -1949,6 +1952,62 @@ function showMainStatsError() {
     
     if (scorersTable) scorersTable.innerHTML = errorHTML;
     if (assistsTable) assistsTable.innerHTML = errorHTML;
+}
+
+// Actualizar tarjetas de resumen de estadísticas
+function updateStatsSummary(players) {
+    console.log('📊 Actualizando resumen de estadísticas...');
+    
+    if (!players || players.length === 0) {
+        // Si no hay jugadores, mostrar ceros
+        const totalGoalsEl = document.getElementById('totalGoals');
+        const totalAssistsEl = document.getElementById('totalAssists');
+        const avgGoalsEl = document.getElementById('avgGoalsPerMatch');
+        
+        if (totalGoalsEl) totalGoalsEl.textContent = '0';
+        if (totalAssistsEl) totalAssistsEl.textContent = '0';
+        if (avgGoalsEl) avgGoalsEl.textContent = '0.0';
+        return;
+    }
+    
+    // Calcular totales
+    const totalGoals = players.reduce((sum, player) => sum + (parseInt(player.goals) || 0), 0);
+    const totalAssists = players.reduce((sum, player) => sum + (parseInt(player.assists) || 0), 0);
+    
+    // Calcular promedio de goles por partido (asumiendo que hay partidos jugados)
+    // Para esto necesitamos obtener el número de partidos jugados
+    let avgGoalsPerMatch = 0;
+    if (fixturesData && fixturesData.length > 0) {
+        const playedMatches = fixturesData.filter(match => 
+            match.homeScore !== null && match.awayScore !== null
+        ).length;
+        
+        if (playedMatches > 0) {
+            avgGoalsPerMatch = (totalGoals / playedMatches).toFixed(1);
+        }
+    }
+    
+    // Actualizar elementos DOM
+    const totalGoalsEl = document.getElementById('totalGoals');
+    const totalAssistsEl = document.getElementById('totalAssists');
+    const avgGoalsEl = document.getElementById('avgGoalsPerMatch');
+    
+    if (totalGoalsEl) {
+        totalGoalsEl.textContent = totalGoals;
+        console.log('✅ Goles totales actualizados:', totalGoals);
+    }
+    
+    if (totalAssistsEl) {
+        totalAssistsEl.textContent = totalAssists;
+        console.log('✅ Asistencias totales actualizadas:', totalAssists);
+    }
+    
+    if (avgGoalsEl) {
+        avgGoalsEl.textContent = avgGoalsPerMatch;
+        console.log('✅ Promedio goles/partido actualizado:', avgGoalsPerMatch);
+    }
+    
+    console.log(`📊 Resumen actualizado: ${totalGoals} goles, ${totalAssists} asistencias, ${avgGoalsPerMatch} promedio`);
 }
 
 // Función principal para cargar la pestaña de estadísticas
