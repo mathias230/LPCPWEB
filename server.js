@@ -280,6 +280,12 @@ async function loadTournamentData() {
 // Cargar datos del torneo
 loadTournamentData();
 
+// EJECUTAR DIAGNÓSTICO INICIAL
+console.log('🚀 EJECUTANDO DIAGNÓSTICO INICIAL AL ARRANCAR SERVIDOR...');
+setTimeout(() => {
+    diagnosticReport();
+}, 3000); // 3 segundos después del inicio
+
 // Función para guardar datos localmente y hacer backup en Cloudinary (OPTIMIZADA)
 function saveData() {
     // Guardado síncrono inmediato para garantizar persistencia local
@@ -532,6 +538,71 @@ setInterval(() => {
     autoBackup('periodic_5min');
 }, 5 * 60 * 1000); // 5 minutos
 
+// SISTEMA DE DIAGNÓSTICO COMPLETO
+function diagnosticReport() {
+    const timestamp = new Date().toISOString();
+    console.log('\n🔍 ==================== DIAGNÓSTICO COMPLETO ====================');
+    console.log(`⏰ Timestamp: ${timestamp}`);
+    console.log('\n📊 ESTADO DE VARIABLES:');
+    console.log(`   - teams: ${teams ? teams.length : 'undefined'} elementos`);
+    console.log(`   - players: ${players ? players.length : 'undefined'} elementos`);
+    console.log(`   - clubs: ${clubs ? clubs.length : 'undefined'} elementos`);
+    console.log(`   - clips: ${clips ? clips.length : 'undefined'} elementos`);
+    console.log(`   - tournament.teams: ${tournament.teams ? tournament.teams.length : 'undefined'} elementos`);
+    
+    console.log('\n🏆 EQUIPOS ACTUALES:');
+    if (teams && teams.length > 0) {
+        teams.forEach((team, index) => {
+            console.log(`   ${index + 1}. ${team.name} (ID: ${team.id})`);
+        });
+    } else {
+        console.log('   ❌ No hay equipos');
+    }
+    
+    console.log('\n👥 JUGADORES ACTUALES:');
+    if (players && players.length > 0) {
+        players.forEach((player, index) => {
+            console.log(`   ${index + 1}. ${player.name} - ${player.clubName} (ID: ${player.id})`);
+        });
+    } else {
+        console.log('   ❌ No hay jugadores');
+    }
+    
+    console.log('\n🏢 CLUBES ACTUALES:');
+    if (clubs && clubs.length > 0) {
+        clubs.forEach((club, index) => {
+            console.log(`   ${index + 1}. ${club.name} (ID: ${club.id})`);
+        });
+    } else {
+        console.log('   ❌ No hay clubes');
+    }
+    
+    // Verificar archivos en disco
+    console.log('\n💾 ARCHIVOS EN DISCO:');
+    const tournamentFile = path.join(dataDir, 'tournament.json');
+    if (fs.existsSync(tournamentFile)) {
+        try {
+            const fileData = JSON.parse(fs.readFileSync(tournamentFile, 'utf8'));
+            console.log(`   ✅ tournament.json existe`);
+            console.log(`   - teams en archivo: ${fileData.teams ? fileData.teams.length : 'undefined'}`);
+            console.log(`   - players en archivo: ${fileData.players ? fileData.players.length : 'undefined'}`);
+            console.log(`   - clubs en archivo: ${fileData.clubs ? fileData.clubs.length : 'undefined'}`);
+        } catch (error) {
+            console.log(`   ❌ Error leyendo tournament.json: ${error.message}`);
+        }
+    } else {
+        console.log('   ❌ tournament.json NO existe');
+    }
+    
+    console.log('🔍 ==================== FIN DIAGNÓSTICO ====================\n');
+}
+
+// DIAGNÓSTICO AUTOMÁTICO cada 60 segundos
+setInterval(() => {
+    console.log('\n⏰ DIAGNÓSTICO AUTOMÁTICO:');
+    diagnosticReport();
+}, 60 * 1000); // 60 segundos
+
 // BACKUP AUTOMÁTICO FRECUENTE: Cada 30 segundos (solo local, sin Cloudinary)
 setInterval(() => {
     try {
@@ -548,6 +619,9 @@ setInterval(() => {
         
         fs.writeFileSync(tournamentFile, JSON.stringify(quickData, null, 2));
         console.log('💾 Quick-save local completado');
+        
+        // Mini diagnóstico después del quick-save
+        console.log(`📊 Quick-save: teams=${teams.length}, players=${players.length}, clubs=${clubs.length}`);
     } catch (error) {
         console.warn('⚠️ Error en quick-save:', error.message);
     }
@@ -645,6 +719,45 @@ global.addMatch = addMatch;
 global.updateMatch = updateMatch;
 
 // Rutas de la API
+
+// ENDPOINT DE DIAGNÓSTICO MANUAL
+app.get('/api/diagnostic', (req, res) => {
+    try {
+        console.log('🔍 DIAGNÓSTICO MANUAL SOLICITADO');
+        
+        const diagnosticData = {
+            timestamp: new Date().toISOString(),
+            variables: {
+                teams: teams ? teams.length : 0,
+                players: players ? players.length : 0,
+                clubs: clubs ? clubs.length : 0,
+                clips: clips ? clips.length : 0,
+                tournamentTeams: tournament.teams ? tournament.teams.length : 0
+            },
+            teams: teams || [],
+            players: players || [],
+            clubs: clubs || [],
+            clips: (clips || []).map(c => ({ id: c.id, title: c.title })),
+            tournamentTeams: tournament.teams || []
+        };
+        
+        // También ejecutar diagnóstico en consola
+        diagnosticReport();
+        
+        res.json({
+            success: true,
+            diagnostic: diagnosticData,
+            message: 'Diagnóstico completado - revisa los logs del servidor'
+        });
+    } catch (error) {
+        console.error('❌ Error en diagnóstico manual:', error);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Error ejecutando diagnóstico',
+            details: error.message 
+        });
+    }
+});
 
 // Obtener clips con paginación y filtros
 app.get('/api/clips', (req, res) => {
