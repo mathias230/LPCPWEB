@@ -164,8 +164,11 @@ if (fs.existsSync(statsFile)) {
 
 // Función para cargar datos (primero desde Cloudinary, luego local)
 async function loadTournamentData() {
+    console.log('🔄 Iniciando carga de datos del torneo...');
+    
     // Intentar restaurar desde Cloudinary primero
     const restoredFromCloud = await restoreFromCloudinary();
+    console.log('☁️ Resultado de restauración desde Cloudinary:', restoredFromCloud);
     
     if (!restoredFromCloud) {
         // Si no se pudo restaurar desde Cloudinary, cargar datos locales
@@ -207,20 +210,56 @@ async function loadTournamentData() {
                     console.log('✅ Clubes cargados (local):', clubs.length);
                 }
                 
-                if (data.players && data.players.length > 0) {
-                    players = data.players;
-                    console.log('✅ Jugadores cargados (local):', players.length);
+                // CRÍTICO: Cargar jugadores con logs detallados
+                console.log('🔍 Verificando jugadores en datos:', {
+                    hasPlayers: !!data.players,
+                    playersType: typeof data.players,
+                    playersLength: data.players ? data.players.length : 'N/A'
+                });
+                
+                if (data.players) {
+                    if (data.players.length > 0) {
+                        players = data.players;
+                        console.log('✅ Jugadores cargados (local):', players.length);
+                        console.log('👥 Primeros 3 jugadores:', players.slice(0, 3).map(p => ({ id: p.id, name: p.name, clubName: p.clubName })));
+                    } else {
+                        console.log('⚠️ Array de jugadores está vacío');
+                    }
+                } else {
+                    console.log('❌ No se encontró sección "players" en los datos');
                 }
                 
-                if (data.clips && data.clips.length > 0) {
-                    clips = data.clips;
-                    console.log('✅ Clips cargados (local):', clips.length);
+                // CRÍTICO: Cargar clips con logs detallados
+                console.log('🔍 Verificando clips en datos:', {
+                    hasClips: !!data.clips,
+                    clipsType: typeof data.clips,
+                    clipsLength: data.clips ? data.clips.length : 'N/A'
+                });
+                
+                if (data.clips) {
+                    if (data.clips.length > 0) {
+                        clips = data.clips;
+                        console.log('✅ Clips cargados (local):', clips.length);
+                        console.log('🎬 Primeros 3 clips:', clips.slice(0, 3).map(c => ({ id: c.id, title: c.title })));
+                    } else {
+                        console.log('⚠️ Array de clips está vacío');
+                    }
+                } else {
+                    console.log('❌ No se encontró sección "clips" en los datos');
                 }
                 
                 if (data.stats) {
                     stats = { ...stats, ...data.stats };
                     console.log('✅ Estadísticas cargadas (local)');
                 }
+                
+                // RESUMEN FINAL DE CARGA
+                console.log('🎯 RESUMEN FINAL DE CARGA:');
+                console.log('   - Equipos:', teams.length);
+                console.log('   - Partidos:', matches.length);
+                console.log('   - Jugadores:', players.length);
+                console.log('   - Clips:', clips.length);
+                console.log('   - Clubes:', clubs.length);
                 
             } catch (error) {
                 console.error('❌ Error cargando datos del torneo:', error);
@@ -230,6 +269,8 @@ async function loadTournamentData() {
             console.log('📝 Archivo de torneo no encontrado, usando datos por defecto');
         }
     }
+    
+    console.log('✅ Función loadTournamentData completada');
 }
 
 // Cargar datos del torneo
@@ -300,8 +341,18 @@ async function backupToCloudinary(data) {
 
 // Función para restaurar datos desde Cloudinary
 async function restoreFromCloudinary() {
+    console.log('☁️ Intentando restaurar desde Cloudinary...');
+    
     try {
         if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY) {
+            console.log('🔑 Credenciales de Cloudinary encontradas');
+            
+            // TEMPORAL: Deshabilitar restauración desde Cloudinary para forzar carga local
+            console.log('⚠️ Restauración desde Cloudinary deshabilitada temporalmente');
+            console.log('📁 Procediendo con carga local...');
+            return false;
+            
+            /* CÓDIGO ORIGINAL COMENTADO HASTA CORREGIR FETCH
             const backupUrl = cloudinary.url('lpcp/backups/tournament_data.json', {
                 resource_type: 'raw'
             });
@@ -324,10 +375,15 @@ async function restoreFromCloudinary() {
                 console.log('☁️ Datos restaurados desde Cloudinary exitosamente');
                 return true;
             }
+            */
+        } else {
+            console.log('❌ Credenciales de Cloudinary no encontradas');
         }
     } catch (error) {
-        console.warn('⚠️ No se pudo restaurar desde Cloudinary (usando datos locales):', error.message);
+        console.warn('⚠️ Error en restauración desde Cloudinary:', error.message);
     }
+    
+    console.log('📁 Continuando con carga local...');
     return false;
 }
 

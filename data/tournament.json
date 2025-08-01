@@ -93,8 +93,8 @@
       "time": "19:00",
       "matchday": 1,
       "status": "finished",
-      "homeScore": null,
-      "awayScore": null
+      "homeScore": 1,
+      "awayScore": 2
     },
     {
       "id": 1753728220778,
@@ -139,21 +139,6 @@
       "status": "finished",
       "homeScore": 1,
       "awayScore": 0
-    },
-    {
-      "id": 1753989309280,
-      "homeTeam": "Punta Coco FC",
-      "awayTeam": "Rayos X FC",
-      "homeTeamId": 8,
-      "awayTeamId": 10,
-      "homeTeamLogo": "img/default-team.png",
-      "awayTeamLogo": "img/default-team.png",
-      "date": "2000-11-11",
-      "time": "11:11",
-      "matchday": 1,
-      "status": "scheduled",
-      "homeScore": null,
-      "awayScore": null
     }
   ],
   "standings": [
@@ -182,19 +167,19 @@
       "position": 2
     },
     {
-      "team": "LOS PLEBES Tk",
+      "team": "FC WEST SIDE",
       "played": 1,
       "won": 1,
       "drawn": 0,
       "lost": 0,
-      "goalsFor": 1,
-      "goalsAgainst": 0,
+      "goalsFor": 2,
+      "goalsAgainst": 1,
       "goalDifference": 1,
       "points": 3,
       "position": 3
     },
     {
-      "team": "Tiki Taka FC",
+      "team": "LOS PLEBES Tk",
       "played": 1,
       "won": 1,
       "drawn": 0,
@@ -206,7 +191,7 @@
       "position": 4
     },
     {
-      "team": "WEST SIDE PTY",
+      "team": "Tiki Taka FC",
       "played": 1,
       "won": 1,
       "drawn": 0,
@@ -218,27 +203,27 @@
       "position": 5
     },
     {
-      "team": "FC WEST SIDE",
+      "team": "WEST SIDE PTY",
       "played": 1,
-      "won": 0,
-      "drawn": 1,
+      "won": 1,
+      "drawn": 0,
       "lost": 0,
-      "goalsFor": null,
-      "goalsAgainst": null,
-      "goalDifference": null,
-      "points": 1,
+      "goalsFor": 1,
+      "goalsAgainst": 0,
+      "goalDifference": 1,
+      "points": 3,
       "position": 6
     },
     {
       "team": "Punta Coco FC",
       "played": 1,
       "won": 0,
-      "drawn": 1,
-      "lost": 0,
-      "goalsFor": null,
-      "goalsAgainst": null,
-      "goalDifference": null,
-      "points": 1,
+      "drawn": 0,
+      "lost": 1,
+      "goalsFor": 1,
+      "goalsAgainst": 2,
+      "goalDifference": -1,
+      "points": 0,
       "position": 7
     },
     {
@@ -423,28 +408,36 @@
   ],
   "players": [
     {
-      "id": 1753991614452,
-      "name": "ss",
+      "id": 1754021305774,
+      "name": "fggg",
       "clubId": 1,
       "clubName": "ACP 507",
       "position": "Jugador",
       "age": 25,
-      "number": 2,
+      "number": 1,
       "nationality": "Panamá",
       "photo": "",
-      "registeredAt": "2025-07-31T19:53:34.452Z"
-    },
-    {
-      "id": 1753991935683,
-      "name": "ss",
-      "clubId": 1,
-      "clubName": "ACP 507",
-      "position": "Jugador",
-      "age": 25,
-      "number": 3,
-      "nationality": "Panamá",
-      "photo": "",
-      "registeredAt": "2025-07-31T19:58:55.683Z"
+      "registeredAt": "2025-08-01T04:08:25.774Z"
     }
-  ]
+  ],
+  "clips": [
+    {
+      "id": "1754021440532",
+      "title": "fdsfsd",
+      "description": "sdffsdfsd",
+      "type": "atajadas",
+      "club": "Coiner FC",
+      "filename": "lpcp-clips/lpcp-clips/clip-1754021434358-732060995",
+      "video_url": "https://res.cloudinary.com/dhj8sgwga/video/upload/v1754021434/lpcp-clips/lpcp-clips/clip-1754021434358-732060995.mp4",
+      "upload_date": "2025-08-01T04:10:40.532Z",
+      "views": 0,
+      "likes": 0,
+      "liked_by": []
+    }
+  ],
+  "stats": {
+    "total_clips": 1,
+    "total_views": 4,
+    "total_likes": 0
+  }
 }

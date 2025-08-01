@@ -2502,7 +2502,7 @@ window.deleteClip = deleteClip;
 
 // Funciones de configuración
 window.addClassificationZone = addClassificationZone;
-window.removeClassificationZone = removeClassificationZone;
+// window.removeClassificationZone = removeClassificationZone; // Función no implementada
 window.saveTableConfig = saveTableConfig;
 window.saveTournamentConfig = saveTournamentConfig;
 
