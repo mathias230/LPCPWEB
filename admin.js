@@ -2942,6 +2942,66 @@ async function cleanOrphanedPlayers() {
 // Exponer la función globalmente
 window.cleanOrphanedPlayers = cleanOrphanedPlayers;
 
+// Función para limpiar tabla de posiciones cuando no hay equipos
+async function cleanStandingsTable() {
+    try {
+        console.log('🧹 Iniciando limpieza de tabla de posiciones...');
+        
+        // Obtener equipos actuales
+        const teamsResponse = await fetch('/api/teams');
+        if (!teamsResponse.ok) throw new Error('Error obteniendo equipos');
+        const currentTeams = await teamsResponse.json();
+        
+        // Obtener tabla de posiciones actual
+        const standingsResponse = await fetch('/api/standings');
+        if (!standingsResponse.ok) throw new Error('Error obteniendo tabla');
+        const currentStandings = await standingsResponse.json();
+        
+        console.log(`📊 Equipos actuales: ${currentTeams.length}`);
+        console.log(`📊 Equipos en tabla: ${currentStandings.length}`);
+        
+        if (currentTeams.length === 0 && currentStandings.length > 0) {
+            // No hay equipos pero sí hay tabla - limpiar
+            const confirmed = confirm(`¿Limpiar tabla de posiciones?\n\nSe eliminarán ${currentStandings.length} equipos de la tabla.`);
+            
+            if (!confirmed) {
+                showNotification('Limpieza cancelada', 'info');
+                return;
+            }
+            
+            // Limpiar tabla enviando array vacío
+            const cleanResponse = await fetch('/api/standings', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify([])
+            });
+            
+            if (cleanResponse.ok) {
+                showNotification('Tabla de posiciones limpiada exitosamente', 'success');
+                console.log('✅ Tabla de posiciones limpiada');
+            } else {
+                showNotification('Error limpiando tabla de posiciones', 'error');
+            }
+            
+        } else if (currentTeams.length > 0 && currentStandings.length === 0) {
+            showNotification('Hay equipos pero no tabla. Usa "Generar Tabla" en la sección Equipos', 'info');
+        } else if (currentTeams.length === 0 && currentStandings.length === 0) {
+            showNotification('No hay equipos ni tabla. Todo está limpio', 'success');
+        } else {
+            showNotification('Equipos y tabla están sincronizados', 'success');
+        }
+        
+    } catch (error) {
+        console.error('❌ Error en limpieza de tabla:', error);
+        showNotification('Error en la limpieza: ' + error.message, 'error');
+    }
+}
+
+// Exponer la función globalmente
+window.cleanStandingsTable = cleanStandingsTable;
+
 // ============ VERIFICACIÓN OCR DE LISTAS DE JUGADORES ============
 
 // Inicializar verificación OCR

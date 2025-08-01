@@ -697,9 +697,16 @@
             </div>
         </div>
 
-        <!-- Clubs Section -->
-        <div class="admin-section" id="clubs">
-            <h2><i class="fas fa-shield-alt"></i> Gestión de Clubes</h2>
+        <!-- Teams Section -->
+        <div class="admin-section" id="teams">
+            <h2><i class="fas fa-shield-alt"></i> Gestión de Equipos</h2>
+            
+            <!-- Cleanup Buttons -->
+            <div style="margin-bottom: 20px; text-align: right; display: flex; gap: 10px; justify-content: flex-end;">
+                <button class="btn" onclick="cleanStandingsTable()" style="background: linear-gradient(45deg, #e74c3c, #c0392b); font-size: 14px; padding: 8px 16px;">
+                    <i class="fas fa-table"></i> Limpiar Tabla de Posiciones
+                </button>
+            </div>
             <p style="color: rgba(255,255,255,0.7); margin-bottom: 20px;">Gestiona la información de los clubes que aparece en la página principal</p>
             
             <form id="clubForm">
