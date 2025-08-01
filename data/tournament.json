@@ -406,20 +406,7 @@
       "logo": "/img/West Side PTY.jpg"
     }
   ],
-  "players": [
-    {
-      "id": 1754021305774,
-      "name": "fggg",
-      "clubId": 1,
-      "clubName": "ACP 507",
-      "position": "Jugador",
-      "age": 25,
-      "number": 1,
-      "nationality": "Panamá",
-      "photo": "",
-      "registeredAt": "2025-08-01T04:08:25.774Z"
-    }
-  ],
+  "players": [],
   "clips": [
     {
       "id": "1754021440532",

@@ -636,6 +636,45 @@ async function updatePlayerQuick(playerId, updates) {
     }
 }
 
+// Eliminar jugador desde API
+async function deletePlayerFromAPI(playerId) {
+    try {
+        console.log('🔄 Eliminando jugador con ID:', playerId);
+        
+        const response = await fetch(`/api/players/${playerId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || `Error HTTP: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        console.log('✅ Jugador eliminado exitosamente:', result);
+        
+        // Actualizar array local de jugadores
+        const playerIndex = players.findIndex(p => p.id === playerId);
+        if (playerIndex !== -1) {
+            players.splice(playerIndex, 1);
+        }
+        
+        // Recargar jugadores del equipo actual
+        if (selectedTeamId) {
+            loadTeamPlayers(selectedTeamId);
+        }
+        
+        showNotification('Jugador eliminado exitosamente', 'success');
+        
+    } catch (error) {
+        console.error('❌ Error eliminando jugador:', error);
+        showNotification(`Error eliminando jugador: ${error.message}`, 'error');
+    }
+}
+
 // Eliminar jugador (versión rápida)
 function deletePlayerQuick(playerId) {
     console.log('🗑️ deletePlayerQuick llamada con playerId:', playerId, 'tipo:', typeof playerId);
