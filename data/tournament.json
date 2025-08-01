@@ -406,25 +406,27 @@
       "logo": "/img/West Side PTY.jpg"
     }
   ],
-  "players": [],
-  "clips": [
+  "players": [
     {
-      "id": "1754021440532",
-      "title": "fdsfsd",
-      "description": "sdffsdfsd",
-      "type": "atajadas",
-      "club": "Coiner FC",
-      "filename": "lpcp-clips/lpcp-clips/clip-1754021434358-732060995",
-      "video_url": "https://res.cloudinary.com/dhj8sgwga/video/upload/v1754021434/lpcp-clips/lpcp-clips/clip-1754021434358-732060995.mp4",
-      "upload_date": "2025-08-01T04:10:40.532Z",
-      "views": 0,
-      "likes": 0,
-      "liked_by": []
+      "id": 1754023173890,
+      "name": "hhh",
+      "clubId": 1,
+      "clubName": "ACP 507",
+      "position": "Jugador",
+      "age": 25,
+      "number": 1,
+      "nationality": "Panamá",
+      "photo": "",
+      "registeredAt": "2025-08-01T04:39:33.891Z",
+      "goals": 2,
+      "assists": 2,
+      "updatedAt": "2025-08-01T05:23:43.774Z"
     }
   ],
+  "clips": [],
   "stats": {
-    "total_clips": 1,
-    "total_views": 4,
+    "total_clips": 0,
+    "total_views": 0,
     "total_likes": 0
   }
 }

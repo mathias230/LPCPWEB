@@ -2896,6 +2896,450 @@ body {
     border: 1px solid #4CAF50;
 }
 
+/* ==================== STATISTICS TAB STYLES ==================== */
+
+.stats-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    margin-bottom: 3rem;
+}
+
+.stats-section {
+    background: linear-gradient(135deg, rgba(0, 102, 204, 0.1), rgba(0, 212, 255, 0.05));
+    border: 1px solid rgba(0, 212, 255, 0.2);
+    border-radius: 15px;
+    padding: 1.5rem;
+    backdrop-filter: blur(10px);
+    position: relative;
+    overflow: hidden;
+}
+
+.stats-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--gradient-primary);
+}
+
+.stats-header {
+    margin-bottom: 1.5rem;
+}
+
+.stats-title {
+    font-size: 1.4rem;
+    font-weight: 600;
+    color: var(--text-light);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.stats-title i {
+    color: var(--accent-blue);
+    font-size: 1.2rem;
+}
+
+.stats-table-container {
+    overflow-x: auto;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.stats-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.stats-table thead {
+    background: linear-gradient(135deg, var(--accent-blue), rgba(0, 212, 255, 0.8));
+}
+
+.stats-table th {
+    padding: 1rem 0.8rem;
+    text-align: left;
+    font-weight: 600;
+    color: var(--dark-bg);
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.stats-table td {
+    padding: 1rem 0.8rem;
+    border-bottom: 1px solid rgba(0, 212, 255, 0.1);
+    color: var(--text-light);
+    transition: background-color 0.3s ease;
+}
+
+.stats-table tbody tr:hover {
+    background: rgba(0, 212, 255, 0.05);
+}
+
+.stats-table .rank-col {
+    width: 60px;
+    text-align: center;
+    font-weight: 600;
+    color: var(--accent-gold);
+}
+
+.stats-table .player-col {
+    width: 40%;
+    font-weight: 500;
+}
+
+.stats-table .team-col {
+    width: 35%;
+    color: var(--text-muted);
+}
+
+.stats-table .goals-col,
+.stats-table .assists-col {
+    width: 80px;
+    text-align: center;
+    font-weight: 600;
+    color: var(--accent-blue);
+    font-size: 1.1rem;
+}
+
+.stats-table .no-data {
+    text-align: center;
+    color: var(--text-muted);
+    font-style: italic;
+    padding: 2rem;
+}
+
+.stats-table .no-data i {
+    margin-right: 0.5rem;
+    color: var(--accent-blue);
+}
+
+/* Stats Summary Cards */
+.stats-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-top: 2rem;
+}
+
+.summary-card {
+    background: linear-gradient(135deg, rgba(0, 102, 204, 0.15), rgba(0, 212, 255, 0.08));
+    border: 1px solid rgba(0, 212, 255, 0.3);
+    border-radius: 15px;
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.summary-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--gradient-primary);
+}
+
+.summary-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 30px rgba(0, 212, 255, 0.2);
+    border-color: var(--accent-blue);
+}
+
+.summary-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: var(--gradient-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: white;
+    flex-shrink: 0;
+}
+
+.summary-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.summary-number {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--accent-blue);
+    font-family: 'Orbitron', monospace;
+    line-height: 1;
+}
+
+.summary-label {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 0.25rem;
+}
+
+/* Team logo styles for stats tables */
+.team-logo-small {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-right: 8px;
+}
+
+.team-info {
+    display: flex;
+    align-items: center;
+    font-size: 0.85rem;
+}
+
+.player-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.player-number {
+    background: var(--primary-color);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    min-width: 20px;
+    text-align: center;
+}
+
+.player-name {
+    font-weight: 500;
+}
+
+/* ============ QUICK STATS SECTION ============ */
+.quick-stats-section {
+    margin: 2rem 0;
+    padding: 1.5rem;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.quick-stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+}
+
+.quick-stats-card {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 1.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.quick-stats-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.quick-stats-header i {
+    color: var(--primary-color);
+    font-size: 1.2rem;
+}
+
+.quick-stats-header h3 {
+    color: var(--text-primary);
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+.quick-stats-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.quick-stat-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.quick-stat-item:last-child {
+    border-bottom: none;
+}
+
+.quick-stat-player {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.quick-stat-rank {
+    background: var(--primary-color);
+    color: white;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: bold;
+}
+
+.quick-stat-name {
+    color: var(--text-primary);
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
+.quick-stat-team {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    margin-left: 0.5rem;
+}
+
+.quick-stat-value {
+    background: rgba(var(--primary-color-rgb), 0.2);
+    color: var(--primary-color);
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-weight: bold;
+    font-size: 0.85rem;
+}
+
+.loading-stats {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    color: var(--text-muted);
+    padding: 1rem;
+    font-size: 0.9rem;
+}
+
+.loading-stats i {
+    color: var(--primary-color);
+}
+
+/* Responsive design for quick stats */
+@media (max-width: 768px) {
+    .quick-stats-grid {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+    
+    .quick-stats-section {
+        margin: 1.5rem 0;
+        padding: 1rem;
+    }
+    
+    .quick-stats-card {
+        padding: 1rem;
+    }
+    
+    .quick-stats-header h3 {
+        font-size: 1rem;
+    }
+    
+    .quick-stat-name {
+        font-size: 0.85rem;
+    }
+    
+    .quick-stat-team {
+        font-size: 0.75rem;
+    }
+}
+
+/* Responsive Design for Stats */
+@media (max-width: 768px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+    
+    .stats-container {
+        padding: 1rem;
+    }
+    
+    .stats-table th,
+    .stats-table td {
+        padding: 8px 4px;
+        font-size: 0.8rem;
+    }
+    
+    .stats-title {
+        font-size: 1.2rem;
+    }
+    
+    .summary-card {
+        padding: 1rem;
+    }
+    
+    .summary-number {
+        font-size: 1.5rem;
+    }
+    
+    .summary-icon {
+        width: 50px;
+        height: 50px;
+        font-size: 1.2rem;
+    }
+    
+    .team-logo-small {
+        width: 16px;
+        height: 16px;
+        margin-right: 6px;
+    }
+    
+    .player-number {
+        padding: 1px 4px;
+        font-size: 0.7rem;
+        min-width: 16px;
+    }
+}
+
+@media (max-width: 480px) {
+    .stats-table .player-col {
+        width: 45%;
+    }
+    
+    .stats-table .team-col {
+        width: 30%;
+        font-size: 0.75rem;
+    }
+    
+    .summary-card {
+        flex-direction: column;
+        text-align: center;
+        gap: 0.8rem;
+    }
+}
+
 /* Schedule Timeline */
 .schedule-overview {
     margin-bottom: 2rem;

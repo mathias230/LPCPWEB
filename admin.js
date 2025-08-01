@@ -46,9 +46,27 @@ function initializeWebSocket() {
             populateTeamSelects();
         });
         
+        // Handler para actualizaciones de jugadores
+        socket.on('playersUpdate', (updatedPlayers) => {
+            console.log('🏃 Actualización de jugadores recibida:', updatedPlayers.length);
+            players = updatedPlayers;
+            if (currentTab === 'players' && selectedTeamId) {
+                loadTeamPlayers(selectedTeamId);
+            }
+        });
+        
+        // Handler para cambios específicos de estadísticas
+        socket.on('playerStatsChanged', (data) => {
+            console.log(`📊 Estadística actualizada: ${data.playerName} - ${data.statType}: ${data.value}`);
+            showNotification(`${data.playerName}: ${data.statType === 'goals' ? 'Goles' : 'Asistencias'} actualizado a ${data.value}`, 'success');
+        });
+        
         socket.on('disconnect', () => {
             console.log('❌ Admin desconectado del servidor WebSocket');
         });
+        
+        // Hacer socket disponible globalmente para updatePlayerStats
+        window.socket = socket;
     }
 }
 
@@ -477,25 +495,52 @@ function renderTeamPlayers() {
         `;
         
         playerCard.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div style="flex: 1; min-width: 0;">
-                    <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
-                        <span style="background: #00ff88; color: #0a0a0a; padding: 2px 6px; border-radius: 50%; font-weight: bold; font-size: 10px; min-width: 18px; text-align: center; line-height: 1;">
-                            ${player.number || '?'}
-                        </span>
-                        <span style="color: white; font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${player.name}</span>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                <!-- Player Info -->
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
+                            <span style="background: #00ff88; color: #0a0a0a; padding: 2px 6px; border-radius: 50%; font-weight: bold; font-size: 10px; min-width: 18px; text-align: center; line-height: 1;">
+                                ${player.number || '?'}
+                            </span>
+                            <span style="color: white; font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${player.name}</span>
+                        </div>
+                        <div style="color: rgba(255,255,255,0.6); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            ${player.position || 'Jugador'} • ${player.age || '--'} años
+                        </div>
                     </div>
-                    <div style="color: rgba(255,255,255,0.6); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                        ${player.position || 'Jugador'} • ${player.age || '--'} años
+                    <div style="display: flex; gap: 3px; margin-left: 8px;">
+                        <button onclick="editPlayerQuick('${player.id}')" style="background: rgba(0,255,136,0.2); border: 1px solid #00ff88; color: #00ff88; padding: 4px; border-radius: 4px; cursor: pointer; font-size: 10px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button onclick="deletePlayerQuick('${player.id}')" style="background: rgba(255,0,0,0.2); border: 1px solid #ff4444; color: #ff4444; padding: 4px; border-radius: 4px; cursor: pointer; font-size: 10px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">
+                            <i class="fas fa-trash"></i>
+                        </button>
                     </div>
                 </div>
-                <div style="display: flex; gap: 3px; margin-left: 8px;">
-                    <button onclick="editPlayerQuick('${player.id}')" style="background: rgba(0,255,136,0.2); border: 1px solid #00ff88; color: #00ff88; padding: 4px; border-radius: 4px; cursor: pointer; font-size: 10px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                    <button onclick="deletePlayerQuick('${player.id}')" style="background: rgba(255,0,0,0.2); border: 1px solid #ff4444; color: #ff4444; padding: 4px; border-radius: 4px; cursor: pointer; font-size: 10px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">
-                        <i class="fas fa-trash"></i>
-                    </button>
+                
+                <!-- Stats Section -->
+                <div style="display: flex; gap: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);">
+                    <div style="flex: 1; display: flex; align-items: center; gap: 4px;">
+                        <i class="fas fa-futbol" style="color: #00ff88; font-size: 10px;"></i>
+                        <span style="color: rgba(255,255,255,0.7); font-size: 10px;">Goles:</span>
+                        <input type="number" 
+                               value="${player.goals || 0}" 
+                               min="0" 
+                               max="999"
+                               onchange="updatePlayerStats('${player.id}', 'goals', this.value)"
+                               style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 2px 4px; border-radius: 3px; width: 35px; font-size: 10px; text-align: center;">
+                    </div>
+                    <div style="flex: 1; display: flex; align-items: center; gap: 4px;">
+                        <i class="fas fa-hands-helping" style="color: #00ff88; font-size: 10px;"></i>
+                        <span style="color: rgba(255,255,255,0.7); font-size: 10px;">Asist:</span>
+                        <input type="number" 
+                               value="${player.assists || 0}" 
+                               min="0" 
+                               max="999"
+                               onchange="updatePlayerStats('${player.id}', 'assists', this.value)"
+                               style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 2px 4px; border-radius: 3px; width: 35px; font-size: 10px; text-align: center;">
+                    </div>
                 </div>
             </div>
         `;
@@ -2230,10 +2275,118 @@ async function clearPlayoffMatch(matchId) {
     }
 }
 
+// ============ PLAYER STATS MANAGEMENT ============
+
+// Actualizar estadísticas de jugador (goles y asistencias)
+window.updatePlayerStats = async function updatePlayerStats(playerId, statType, value) {
+    try {
+        console.log(`📊 Actualizando ${statType} del jugador ${playerId}: ${value}`);
+        console.log('🔍 Array de jugadores:', players.length, 'jugadores');
+        console.log('🔍 Tipo de playerId:', typeof playerId, playerId);
+        
+        // Validar valor
+        const numValue = parseInt(value) || 0;
+        if (numValue < 0) {
+            showNotification('El valor no puede ser negativo', 'error');
+            return;
+        }
+        
+        // Encontrar el jugador en el array local (comparar tanto string como number)
+        let playerIndex = players.findIndex(p => p.id === playerId);
+        
+        // Si no se encuentra, intentar con conversión de tipos
+        if (playerIndex === -1) {
+            playerIndex = players.findIndex(p => p.id == playerId); // Comparación flexible
+        }
+        
+        // Si aún no se encuentra, intentar con conversión a número
+        if (playerIndex === -1) {
+            const numPlayerId = parseInt(playerId);
+            playerIndex = players.findIndex(p => p.id === numPlayerId);
+        }
+        
+        if (playerIndex === -1) {
+            console.error('❌ Jugador no encontrado. IDs disponibles:', players.map(p => `${p.id} (${typeof p.id})`));
+            showNotification('Jugador no encontrado', 'error');
+            return;
+        }
+        
+        console.log('✅ Jugador encontrado:', players[playerIndex].name, 'en índice', playerIndex);
+        
+        // Actualizar localmente primero para respuesta rápida
+        const oldValue = players[playerIndex][statType] || 0;
+        players[playerIndex][statType] = numValue;
+        
+        // Actualizar en el backend
+        const response = await fetch(`/api/players/${playerId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                ...players[playerIndex],
+                [statType]: numValue
+            })
+        });
+        
+        if (response.ok) {
+            const updatedPlayer = await response.json();
+            players[playerIndex] = updatedPlayer;
+            
+            // Actualizar también el array de teamPlayers si es necesario
+            const teamPlayerIndex = teamPlayers.findIndex(p => p.id === playerId);
+            if (teamPlayerIndex !== -1) {
+                teamPlayers[teamPlayerIndex] = updatedPlayer;
+            }
+            
+            console.log(`✅ ${statType} actualizado: ${oldValue} → ${numValue}`);
+            showNotification(`${statType === 'goals' ? 'Goles' : 'Asistencias'} actualizado: ${numValue}`, 'success');
+            
+            // Emitir evento para actualizar estadísticas en tiempo real
+            if (window.socket) {
+                window.socket.emit('playerStatsUpdated', {
+                    playerId: playerId,
+                    statType: statType,
+                    value: numValue,
+                    playerName: players[playerIndex].name
+                });
+            }
+            
+        } else {
+            // Revertir cambio local si falla el backend
+            players[playerIndex][statType] = oldValue;
+            
+            // Revertir el input también
+            const input = document.querySelector(`input[onchange*="updatePlayerStats('${playerId}', '${statType}'"]`);
+            if (input) {
+                input.value = oldValue;
+            }
+            
+            console.error('Error actualizando estadísticas en el backend');
+            showNotification('Error actualizando estadísticas', 'error');
+        }
+        
+    } catch (error) {
+        console.error('Error actualizando estadísticas:', error);
+        showNotification('Error actualizando estadísticas', 'error');
+        
+        // Revertir cambio local
+        const playerIndex = players.findIndex(p => p.id === playerId);
+        if (playerIndex !== -1) {
+            // Revertir el input
+            const input = document.querySelector(`input[onchange*="updatePlayerStats('${playerId}', '${statType}'"]`);
+            if (input) {
+                input.value = players[playerIndex][statType] || 0;
+            }
+        }
+    }
+}
+
 // Make functions globally available
 window.deleteTeam = deleteTeam;
 window.editClub = editClub;
 window.deleteClub = deleteClub;
+window.updatePlayerStats = updatePlayerStats;
 window.cancelClubEdit = cancelClubEdit;
 window.deleteMatch = deleteMatch;
 window.updateMatchResult = updateMatchResult;

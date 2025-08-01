@@ -279,12 +279,22 @@ loadTournamentData();
 // Función para guardar datos localmente y hacer backup en Cloudinary
 function saveData() {
     try {
+        console.log('🔄 INICIANDO GUARDADO DE DATOS...');
+        console.log('📊 Estado actual de arrays:');
+        console.log(`   - players: ${players ? players.length : 'undefined'} elementos`);
+        console.log(`   - clips: ${clips ? clips.length : 'undefined'} elementos`);
+        console.log(`   - teams: ${teams ? teams.length : 'undefined'} elementos`);
+        console.log(`   - clubs: ${clubs ? clubs.length : 'undefined'} elementos`);
+        
         // Guardar clips y stats
+        console.log('💾 Guardando clips.json...');
         fs.writeFileSync(clipsFile, JSON.stringify(clips, null, 2));
+        console.log('💾 Guardando stats.json...');
         fs.writeFileSync(statsFile, JSON.stringify(stats, null, 2));
         
         // Guardar datos del torneo
         const tournamentFile = path.join(dataDir, 'tournament.json');
+        console.log('💾 Preparando tournament.json...');
         const tournamentData = {
             teams: teams,
             matches: matches,
@@ -297,16 +307,32 @@ function saveData() {
             stats: stats // Agregar estadísticas al backup
         };
         
+        console.log('📝 Datos a guardar en tournament.json:');
+        console.log(`   - teams: ${tournamentData.teams ? tournamentData.teams.length : 'undefined'}`);
+        console.log(`   - players: ${tournamentData.players ? tournamentData.players.length : 'undefined'}`);
+        console.log(`   - clips: ${tournamentData.clips ? tournamentData.clips.length : 'undefined'}`);
+        console.log(`   - clubs: ${tournamentData.clubs ? tournamentData.clubs.length : 'undefined'}`);
+        
+        console.log('💾 Escribiendo tournament.json...');
         fs.writeFileSync(tournamentFile, JSON.stringify(tournamentData, null, 2));
+        console.log('✅ tournament.json escrito exitosamente');
+        
+        // Verificar que el archivo se escribió correctamente
+        console.log('🔍 Verificando archivo guardado...');
+        const savedData = JSON.parse(fs.readFileSync(tournamentFile, 'utf8'));
+        console.log('📋 Verificación del archivo guardado:');
+        console.log(`   - players en archivo: ${savedData.players ? savedData.players.length : 'undefined'}`);
+        console.log(`   - clips en archivo: ${savedData.clips ? savedData.clips.length : 'undefined'}`);
         
         // Backup asíncrono en Cloudinary (no bloquea la ejecución)
         backupToCloudinary(tournamentData).catch(error => {
             console.warn('⚠️ Error en backup de Cloudinary:', error.message);
         });
         
-        console.log('✅ Datos guardados exitosamente');
+        console.log('✅ GUARDADO COMPLETADO EXITOSAMENTE');
     } catch (error) {
-        console.error('❌ Error guardando datos:', error);
+        console.error('❌ ERROR CRÍTICO GUARDANDO DATOS:', error);
+        console.error('❌ Stack trace:', error.stack);
     }
 }
 
@@ -632,34 +658,53 @@ app.post('/api/clips/:id/view', (req, res) => {
 app.delete('/api/clips/:id', async (req, res) => {
     try {
         const clipId = req.params.id;
+        console.log('🗑️ INICIANDO ELIMINACIÓN DE CLIP:', clipId);
+        console.log('📊 Estado inicial - clips totales:', clips.length);
+        
         const clipIndex = clips.findIndex(c => c.id === clipId);
         
         if (clipIndex === -1) {
+            console.log('❌ Clip no encontrado con ID:', clipId);
             return res.status(404).json({ success: false, error: 'Clip no encontrado' });
         }
         
         const clip = clips[clipIndex];
-        console.log('🗑️ Eliminando clip:', clip.title, 'ID:', clipId);
+        console.log('🎬 Clip encontrado:', {
+            title: clip.title,
+            id: clipId,
+            index: clipIndex,
+            filename: clip.filename
+        });
         
         // Si el clip está en Cloudinary, intentar eliminarlo
         if (clip.filename) {
             try {
+                console.log('☁️ Eliminando de Cloudinary:', clip.filename);
                 await cloudinary.uploader.destroy(clip.filename, { resource_type: 'video' });
-                console.log('✅ Clip eliminado de Cloudinary:', clip.filename);
+                console.log('✅ Clip eliminado de Cloudinary exitosamente');
             } catch (cloudinaryError) {
                 console.warn('⚠️ Error eliminando de Cloudinary (continuando):', cloudinaryError.message);
             }
         }
         
         // Eliminar de la base de datos local
+        console.log('🗂️ Eliminando del array local...');
         clips.splice(clipIndex, 1);
+        console.log('📊 Clips restantes después de eliminación:', clips.length);
         
         // Actualizar estadísticas
+        console.log('📈 Actualizando estadísticas...');
+        const oldStats = { ...stats };
         stats.total_clips = clips.length;
         stats.total_views = clips.reduce((sum, c) => sum + (c.views || 0), 0);
         stats.total_likes = clips.reduce((sum, c) => sum + (c.likes || 0), 0);
+        console.log('📊 Estadísticas actualizadas:', {
+            antes: oldStats,
+            después: stats
+        });
         
         // Guardar cambios
+        console.log('💾 Llamando a saveData() tras eliminación de clip...');
         saveData();
         
         // Notificar cambio en tiempo real
@@ -1837,7 +1882,17 @@ app.post('/api/players', async (req, res) => {
 app.put('/api/players/:id', uploadImage.single('playerPhoto'), async (req, res) => {
     try {
         const playerId = parseInt(req.params.id);
-        const { playerName, teamId, playerAge, playerPosition, playerNumber, playerNationality } = req.body;
+        const { 
+            playerName, name, 
+            teamId, clubId, 
+            playerAge, age, 
+            playerPosition, position, 
+            playerNumber, number, 
+            playerNationality, nationality,
+            goals, assists 
+        } = req.body;
+        
+        console.log(`🔧 Actualizando jugador ${playerId}:`, req.body);
         
         const playerIndex = players.findIndex(p => p.id === playerId);
         
@@ -1897,8 +1952,9 @@ app.put('/api/players/:id', uploadImage.single('playerPhoto'), async (req, res) 
         
         // Obtener información del club si cambió
         let clubName = players[playerIndex].clubName;
-        if (clubId) {
-            const club = clubs.find(c => c.id === parseInt(clubId));
+        const finalClubId = clubId || teamId;
+        if (finalClubId) {
+            const club = clubs.find(c => c.id === parseInt(finalClubId));
             if (club) {
                 clubName = club.name;
             }
@@ -1907,16 +1963,25 @@ app.put('/api/players/:id', uploadImage.single('playerPhoto'), async (req, res) 
         // Actualizar datos del jugador
         players[playerIndex] = {
             ...players[playerIndex],
-            name: playerName ? playerName.trim() : players[playerIndex].name,
-            age: playerAge ? parseInt(playerAge) : players[playerIndex].age,
-            position: playerPosition ? playerPosition.trim() : players[playerIndex].position,
-            number: playerNumber ? parseInt(playerNumber) : players[playerIndex].number,
-            clubId: clubId ? parseInt(clubId) : players[playerIndex].clubId,
+            name: (playerName || name) ? (playerName || name).trim() : players[playerIndex].name,
+            age: (playerAge || age) ? parseInt(playerAge || age) : players[playerIndex].age,
+            position: (playerPosition || position) ? (playerPosition || position).trim() : players[playerIndex].position,
+            number: (playerNumber || number) ? parseInt(playerNumber || number) : players[playerIndex].number,
+            clubId: finalClubId ? parseInt(finalClubId) : players[playerIndex].clubId,
             clubName: clubName,
-            nationality: playerNationality ? playerNationality.trim() : players[playerIndex].nationality,
+            nationality: (playerNationality || nationality) ? (playerNationality || nationality).trim() : players[playerIndex].nationality,
+            goals: goals !== undefined ? parseInt(goals) || 0 : players[playerIndex].goals || 0,
+            assists: assists !== undefined ? parseInt(assists) || 0 : players[playerIndex].assists || 0,
             photo: photoUrl,
             updatedAt: new Date().toISOString()
         };
+        
+        console.log(`✅ Jugador actualizado:`, {
+            id: players[playerIndex].id,
+            name: players[playerIndex].name,
+            goals: players[playerIndex].goals,
+            assists: players[playerIndex].assists
+        });
         
         // Guardar los cambios
         saveData();
@@ -2365,6 +2430,34 @@ initializeTournamentTeams();
 console.log('📊 Inicializando tabla de posiciones...');
 updateStandingsFromMatches();
 console.log(`✅ Tabla de posiciones inicializada con ${standings.length} equipos`);
+
+// ==================== WEBSOCKET CONFIGURATION ====================
+
+// Configuración de WebSocket para actualizaciones en tiempo real
+io.on('connection', (socket) => {
+    console.log('🔌 Cliente conectado:', socket.id);
+    
+    // Manejar actualización de estadísticas de jugadores
+    socket.on('playerStatsUpdated', (data) => {
+        console.log(`📊 Estadísticas actualizadas - ${data.playerName}: ${data.statType} = ${data.value}`);
+        
+        // Emitir actualización a todos los clientes conectados
+        io.emit('playersUpdate', players);
+        
+        // También emitir evento específico para estadísticas
+        io.emit('playerStatsChanged', {
+            playerId: data.playerId,
+            playerName: data.playerName,
+            statType: data.statType,
+            value: data.value,
+            timestamp: new Date().toISOString()
+        });
+    });
+    
+    socket.on('disconnect', () => {
+        console.log('❌ Cliente desconectado:', socket.id);
+    });
+});
 
 // Iniciar servidor
 server.listen(PORT, () => {

@@ -49,6 +49,11 @@ function setupWebSocket() {
         teamsData = updatedTeams;
         console.log('✅ Equipos actualizados:', teamsData.length);
         
+        // Si estamos en la pestaña de estadísticas, recargar
+        if (document.querySelector('#stats.active')) {
+            loadStats();
+        }
+        
         // Regenerar tabla de posiciones con nuevos equipos
         console.log('📊 Regenerando tabla de posiciones con nuevos equipos...');
         loadStandingsData();
@@ -78,6 +83,21 @@ function setupWebSocket() {
         }
     });
     
+    socket.on('playersUpdate', (updatedPlayers) => {
+        console.log('👤 Actualizando estadísticas de jugadores...');
+        playersStatsData = updatedPlayers;
+        console.log('✅ Estadísticas de jugadores actualizadas:', playersStatsData.length);
+        
+        // Actualizar estadísticas rápidas (siempre visibles)
+        displayQuickTopScorers(updatedPlayers);
+        displayQuickTopAssisters(updatedPlayers);
+        
+        // Si estamos en la pestaña de estadísticas, recargar tablas principales
+        if (document.querySelector('#stats.active')) {
+            loadStats();
+        }
+    });
+    
     socket.on('disconnect', () => {
         console.log('❌ Desconectado del servidor WebSocket');
     });
@@ -92,6 +112,9 @@ let resultsData = [];
 let classificationZones = [];
 let tournamentSettings = {};
 let teamsData = []; // Equipos dinámicos del backend
+let playersStatsData = []; // Estadísticas de jugadores
+let totalGoals = 0;
+let totalAssists = 0;
 
 // Función para obtener el número máximo de jornadas dinámicamente
 function getMaxMatchdays() {
@@ -235,57 +258,60 @@ function switchTab(tabId) {
         case 'schedule':
             loadSchedule();
             break;
+        case 'stats':
+            loadStats();
+            break;
     }
 }
 
 async function loadAllData() {
-    console.log('📊 Cargando todos los datos...');
-    
-    try {
-        // Cargar configuración del torneo
-        await loadTournamentSettings();
+    console.log('📥 Cargando todos los datos...');
         
-        // Cargar equipos dinámicamente
-        await loadTeamsData();
+    // Cargar configuración del torneo
+    loadTournamentSettings();
         
-        // Cargar datos de la tabla de posiciones
-        await loadStandingsData();
-        
-        // Cargar datos de partidos
-        await loadMatchesData();
-        
-        // Actualizar información de temporada
-        updateSeasonInfo();
-        
-        console.log('✅ Todos los datos cargados exitosamente');
-        
-        // Cargar la pestaña activa por defecto (tabla de posiciones)
-        if (document.querySelector('#table.active')) {
-            loadStandingsTable();
-        }
-        
-    } catch (error) {
+    // Cargar equipos
+    loadTeamsData().then(() => {
+        // Una vez cargados los equipos, cargar la tabla de posiciones
+        loadStandingsData();
+            
+        // Cargar partidos
+        loadMatchesData().then(() => {
+            // Actualizar la jornada máxima basada en los partidos cargados
+            getMaxMatchdays();
+                
+            // Cargar estadísticas de jugadores para el apartado rápido
+            loadQuickPlayerStats().then(() => {
+                // Cargar la pestaña activa
+                const activeTab = document.querySelector('.tab-btn.active');
+                if (activeTab) {
+                    const tabId = activeTab.getAttribute('data-tab');
+                    switchTab(tabId);
+                } else {
+                    // Por defecto mostrar la tabla de posiciones
+                    switchTab('table');
+                }
+            });
+        });
+    }).catch(error => {
         console.error('❌ Error cargando datos:', error);
-        
+            
         // Usar datos de respaldo
         console.log('🔄 Usando datos de respaldo...');
         standingsData = generateFallbackStandings();
         fixturesData = generateSampleFixtures();
         teamsData = generateFallbackTeams();
-        
-        // Usar zonas de clasificación por defecto
-        classificationZones = [
-            { id: 1, name: 'Clasificación Directa', positions: '1-4', color: '#00ff88' },
-            { id: 2, name: 'Repechaje', positions: '5-8', color: '#ffa500' },
-            { id: 3, name: 'Eliminación', positions: '9-12', color: '#ff4757' }
-        ];
-        
-        if (document.querySelector('#table.active')) {
-            loadStandingsTable();
+            
+        // Cargar la pestaña activa
+        const activeTab = document.querySelector('.tab-btn.active');
+        if (activeTab) {
+            const tabId = activeTab.getAttribute('data-tab');
+            switchTab(tabId);
+        } else {
+            // Por defecto mostrar la tabla de posiciones
+            switchTab('table');
         }
-        
-        showNotification('Conectando con el servidor...', 'info');
-    }
+    });
 }
 
 // Cargar configuración del torneo
@@ -1536,5 +1562,408 @@ function createFloatingParticles() {
         particle.style.animationDelay = Math.random() * 10 + 's';
         particle.style.animationDuration = (Math.random() * 3 + 2) + 's';
         particlesContainer.appendChild(particle);
+    }
+}
+
+// ============ FUNCIONES DE ESTADÍSTICAS ============
+
+// Cargar estadísticas de jugadores desde la API
+async function loadPlayerStats() {
+    try {
+        console.log('📊 Cargando estadísticas de jugadores...');
+        const response = await fetch('/api/players');
+        if (response.ok) {
+            playersStatsData = await response.json();
+            console.log(`✅ Estadísticas de ${playersStatsData.length} jugadores cargadas`);
+            
+            // Calcular totales
+            totalGoals = playersStatsData.reduce((sum, player) => sum + (parseInt(player.goals) || 0), 0);
+            totalAssists = playersStatsData.reduce((sum, player) => sum + (parseInt(player.assists) || 0), 0);
+            
+            return true;
+        } else {
+            console.warn('⚠️ No se pudieron cargar las estadísticas de jugadores');
+            playersStatsData = [];
+            return false;
+        }
+    } catch (error) {
+        console.error('❌ Error cargando estadísticas de jugadores:', error);
+        playersStatsData = [];
+        return false;
+    }
+}
+
+// Cargar y mostrar estadísticas en la pestaña de estadísticas
+function loadStats() {
+    console.log('📈 Cargando estadísticas...');
+    
+    // Ordenar jugadores por goles y asistencias
+    const topScorers = [...playersStatsData]
+        .sort((a, b) => (parseInt(b.goals) || 0) - (parseInt(a.goals) || 0) || a.name.localeCompare(b.name))
+        .slice(0, 10);
+        
+    const topAssisters = [...playersStatsData]
+        .sort((a, b) => (parseInt(b.assists) || 0) - (parseInt(a.assists) || 0) || a.name.localeCompare(b.name))
+        .slice(0, 10);
+    
+    // Actualizar tablas
+    updateTopScorersTable(topScorers);
+    updateTopAssistsTable(topAssisters);
+    updateStatsSummary();
+}
+
+// Actualizar tabla de goleadores
+function updateTopScorersTable(players) {
+    const tbody = document.getElementById('topScorersList');
+    if (!tbody) return;
+    
+    tbody.innerHTML = '';
+    
+    if (players.length === 0) {
+        tbody.innerHTML = `
+            <tr class="no-data">
+                <td colspan="4">
+                    <i class="fas fa-info-circle"></i>
+                    No hay datos de goleadores disponibles
+                </td>
+            </tr>`;
+        return;
+    }
+    
+    players.forEach((player, index) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="rank">${index + 1}</td>
+            <td class="player">
+                <div class="player-info">
+                    <span class="player-number">${player.number || ''}</span>
+                    <span class="player-name">${player.name || 'Jugador'}</span>
+                </div>
+            </td>
+            <td class="team">
+                <div class="team-info">
+                    <img src="${player.teamLogo || 'img/team-placeholder.png'}" alt="${player.team || ''}" class="team-logo-small">
+                    <span>${player.team || 'Sin equipo'}</span>
+                </div>
+            </td>
+            <td class="goals">${player.goals || 0}</td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+// Actualizar tabla de asistencias
+function updateTopAssistsTable(players) {
+    const tbody = document.getElementById('topAssistsList');
+    if (!tbody) return;
+    
+    tbody.innerHTML = '';
+    
+    if (players.length === 0) {
+        tbody.innerHTML = `
+            <tr class="no-data">
+                <td colspan="4">
+                    <i class="fas fa-info-circle"></i>
+                    No hay datos de asistencias disponibles
+                </td>
+            </tr>`;
+        return;
+    }
+    
+    players.forEach((player, index) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="rank">${index + 1}</td>
+            <td class="player">
+                <div class="player-info">
+                    <span class="player-number">${player.number || ''}</span>
+                    <span class="player-name">${player.name || 'Jugador'}</span>
+                </div>
+            </td>
+            <td class="team">
+                <div class="team-info">
+                    <img src="${player.teamLogo || 'img/team-placeholder.png'}" alt="${player.team || ''}" class="team-logo-small">
+                    <span>${player.team || 'Sin equipo'}</span>
+                </div>
+            </td>
+            <td class="assists">${player.assists || 0}</td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+// Actualizar resumen de estadísticas
+function updateStatsSummary() {
+    // Calcular promedio de goles por partido
+    const totalMatches = fixturesData.filter(match => match.status === 'FINISHED').length || 1;
+    const avgGoalsPerMatch = (totalGoals / totalMatches).toFixed(1);
+    
+    // Actualizar los elementos del DOM
+    const totalGoalsEl = document.getElementById('totalGoals');
+    const totalAssistsEl = document.getElementById('totalAssists');
+    const avgGoalsEl = document.getElementById('avgGoalsPerMatch');
+    
+    if (totalGoalsEl) totalGoalsEl.textContent = totalGoals;
+    if (totalAssistsEl) totalAssistsEl.textContent = totalAssists;
+    if (avgGoalsEl) avgGoalsEl.textContent = avgGoalsPerMatch;
+    
+    console.log(`📊 Resumen actualizado: ${totalGoals} goles, ${totalAssists} asistencias, ${avgGoalsPerMatch} promedio`);
+}
+
+// ============ FUNCIONES PARA APARTADO RÁPIDO DE ESTADÍSTICAS ============
+
+// Cargar estadísticas de jugadores para el apartado rápido
+async function loadQuickPlayerStats() {
+    try {
+        console.log('⚡ Cargando estadísticas rápidas de jugadores...');
+        const response = await fetch('/api/players');
+        if (response.ok) {
+            const players = await response.json();
+            console.log(`✅ ${players.length} jugadores cargados para estadísticas rápidas`);
+            
+            // Mostrar top goleadores y asistidores
+            displayQuickTopScorers(players);
+            displayQuickTopAssisters(players);
+            
+            return true;
+        } else {
+            console.warn('⚠️ No se pudieron cargar las estadísticas rápidas');
+            showQuickStatsError();
+            return false;
+        }
+    } catch (error) {
+        console.error('❌ Error cargando estadísticas rápidas:', error);
+        showQuickStatsError();
+        return false;
+    }
+}
+
+// Mostrar top 5 goleadores en el apartado rápido
+function displayQuickTopScorers(players) {
+    const container = document.getElementById('quickTopScorers');
+    if (!container) return;
+    
+    // Filtrar y ordenar jugadores por goles
+    const topScorers = players
+        .filter(player => (parseInt(player.goals) || 0) > 0)
+        .sort((a, b) => (parseInt(b.goals) || 0) - (parseInt(a.goals) || 0))
+        .slice(0, 5);
+    
+    if (topScorers.length === 0) {
+        container.innerHTML = `
+            <div class="loading-stats">
+                <i class="fas fa-info-circle"></i>
+                No hay goleadores registrados
+            </div>`;
+        return;
+    }
+    
+    container.innerHTML = topScorers.map((player, index) => `
+        <div class="quick-stat-item">
+            <div class="quick-stat-player">
+                <div class="quick-stat-rank">${index + 1}</div>
+                <div>
+                    <div class="quick-stat-name">${player.name || 'Jugador'}</div>
+                    <div class="quick-stat-team">${player.clubName || 'Sin equipo'}</div>
+                </div>
+            </div>
+            <div class="quick-stat-value">${player.goals || 0}</div>
+        </div>
+    `).join('');
+}
+
+// Mostrar top 5 asistidores en el apartado rápido
+function displayQuickTopAssisters(players) {
+    const container = document.getElementById('quickTopAssisters');
+    if (!container) return;
+    
+    // Filtrar y ordenar jugadores por asistencias
+    const topAssisters = players
+        .filter(player => (parseInt(player.assists) || 0) > 0)
+        .sort((a, b) => (parseInt(b.assists) || 0) - (parseInt(a.assists) || 0))
+        .slice(0, 5);
+    
+    if (topAssisters.length === 0) {
+        container.innerHTML = `
+            <div class="loading-stats">
+                <i class="fas fa-info-circle"></i>
+                No hay asistidores registrados
+            </div>`;
+        return;
+    }
+    
+    container.innerHTML = topAssisters.map((player, index) => `
+        <div class="quick-stat-item">
+            <div class="quick-stat-player">
+                <div class="quick-stat-rank">${index + 1}</div>
+                <div>
+                    <div class="quick-stat-name">${player.name || 'Jugador'}</div>
+                    <div class="quick-stat-team">${player.clubName || 'Sin equipo'}</div>
+                </div>
+            </div>
+            <div class="quick-stat-value">${player.assists || 0}</div>
+        </div>
+    `).join('');
+}
+
+// Mostrar error en las estadísticas rápidas
+function showQuickStatsError() {
+    const scorersContainer = document.getElementById('quickTopScorers');
+    const assistersContainer = document.getElementById('quickTopAssisters');
+    
+    const errorHTML = `
+        <div class="loading-stats">
+            <i class="fas fa-exclamation-triangle"></i>
+            Error cargando datos
+        </div>`;
+    
+    if (scorersContainer) scorersContainer.innerHTML = errorHTML;
+    if (assistersContainer) assistersContainer.innerHTML = errorHTML;
+}
+
+// ============ FUNCIONES PARA PESTAÑA PRINCIPAL DE ESTADÍSTICAS ============
+
+// Cargar y mostrar estadísticas completas en la pestaña principal
+async function loadMainStatistics() {
+    try {
+        console.log('📊 Cargando estadísticas principales...');
+        const response = await fetch('/api/players');
+        if (response.ok) {
+            const players = await response.json();
+            console.log(`✅ ${players.length} jugadores cargados para estadísticas principales`);
+            
+            // Poblar tablas principales
+            populateTopScorersTable(players);
+            populateTopAssistsTable(players);
+            updateStatsSummary(players);
+            
+            return true;
+        } else {
+            console.warn('⚠️ No se pudieron cargar las estadísticas principales');
+            showMainStatsError();
+            return false;
+        }
+    } catch (error) {
+        console.error('❌ Error cargando estadísticas principales:', error);
+        showMainStatsError();
+        return false;
+    }
+}
+
+// Poblar tabla de goleadores principales
+function populateTopScorersTable(players) {
+    const tbody = document.getElementById('topScorersList');
+    if (!tbody) return;
+    
+    // Filtrar y ordenar jugadores por goles
+    const topScorers = players
+        .filter(player => (parseInt(player.goals) || 0) > 0)
+        .sort((a, b) => (parseInt(b.goals) || 0) - (parseInt(a.goals) || 0));
+    
+    if (topScorers.length === 0) {
+        tbody.innerHTML = `
+            <tr class="no-data">
+                <td colspan="4">
+                    <i class="fas fa-info-circle"></i>
+                    No hay datos de goleadores disponibles
+                </td>
+            </tr>`;
+        return;
+    }
+    
+    tbody.innerHTML = topScorers.map((player, index) => `
+        <tr class="stats-row">
+            <td class="rank-col">
+                <div class="rank-badge rank-${index + 1}">${index + 1}</div>
+            </td>
+            <td class="player-col">
+                <div class="player-info">
+                    <div class="player-name">${player.name || 'Jugador'}</div>
+                    <div class="player-number">#${player.number || '--'}</div>
+                </div>
+            </td>
+            <td class="team-col">
+                <div class="team-name">${player.clubName || 'Sin equipo'}</div>
+            </td>
+            <td class="goals-col">
+                <div class="stat-value">${player.goals || 0}</div>
+            </td>
+        </tr>
+    `).join('');
+}
+
+// Poblar tabla de asistidores principales
+function populateTopAssistsTable(players) {
+    const tbody = document.getElementById('topAssistsList');
+    if (!tbody) return;
+    
+    // Filtrar y ordenar jugadores por asistencias
+    const topAssisters = players
+        .filter(player => (parseInt(player.assists) || 0) > 0)
+        .sort((a, b) => (parseInt(b.assists) || 0) - (parseInt(a.assists) || 0));
+    
+    if (topAssisters.length === 0) {
+        tbody.innerHTML = `
+            <tr class="no-data">
+                <td colspan="4">
+                    <i class="fas fa-info-circle"></i>
+                    No hay datos de asistencias disponibles
+                </td>
+            </tr>`;
+        return;
+    }
+    
+    tbody.innerHTML = topAssisters.map((player, index) => `
+        <tr class="stats-row">
+            <td class="rank-col">
+                <div class="rank-badge rank-${index + 1}">${index + 1}</div>
+            </td>
+            <td class="player-col">
+                <div class="player-info">
+                    <div class="player-name">${player.name || 'Jugador'}</div>
+                    <div class="player-number">#${player.number || '--'}</div>
+                </div>
+            </td>
+            <td class="team-col">
+                <div class="team-name">${player.clubName || 'Sin equipo'}</div>
+            </td>
+            <td class="assists-col">
+                <div class="stat-value">${player.assists || 0}</div>
+            </td>
+        </tr>
+    `).join('');
+}
+
+// Mostrar error en las estadísticas principales
+function showMainStatsError() {
+    const scorersTable = document.getElementById('topScorersList');
+    const assistsTable = document.getElementById('topAssistsList');
+    
+    const errorHTML = `
+        <tr class="no-data error">
+            <td colspan="4">
+                <i class="fas fa-exclamation-triangle"></i>
+                Error cargando datos
+            </td>
+        </tr>`;
+    
+    if (scorersTable) scorersTable.innerHTML = errorHTML;
+    if (assistsTable) assistsTable.innerHTML = errorHTML;
+}
+
+// Función principal para cargar la pestaña de estadísticas
+function loadStats() {
+    console.log('📊 Cargando pestaña de estadísticas...');
+    
+    // Si ya tenemos datos de jugadores en memoria, usarlos
+    if (playersStatsData && playersStatsData.length > 0) {
+        console.log('✅ Usando datos de jugadores en memoria:', playersStatsData.length);
+        populateTopScorersTable(playersStatsData);
+        populateTopAssistsTable(playersStatsData);
+        updateStatsSummary(playersStatsData);
+    } else {
+        // Si no hay datos en memoria, cargarlos desde la API
+        console.log('🔄 Cargando datos de jugadores desde API...');
+        loadMainStatistics();
     }
 }
