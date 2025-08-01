@@ -212,6 +212,16 @@ async function loadTournamentData() {
                     console.log('✅ Jugadores cargados (local):', players.length);
                 }
                 
+                if (data.clips && data.clips.length > 0) {
+                    clips = data.clips;
+                    console.log('✅ Clips cargados (local):', clips.length);
+                }
+                
+                if (data.stats) {
+                    stats = { ...stats, ...data.stats };
+                    console.log('✅ Estadísticas cargadas (local)');
+                }
+                
             } catch (error) {
                 console.error('❌ Error cargando datos del torneo:', error);
                 console.log('🔄 Usando datos por defecto');
@@ -241,7 +251,9 @@ function saveData() {
             settings: settings,
             bracket: currentBracket,
             clubs: clubs, // Agregar clubes al backup
-            players: players // Agregar jugadores al backup
+            players: players, // Agregar jugadores al backup
+            clips: clips, // Agregar clips al backup
+            stats: stats // Agregar estadísticas al backup
         };
         
         fs.writeFileSync(tournamentFile, JSON.stringify(tournamentData, null, 2));
@@ -306,6 +318,8 @@ async function restoreFromCloudinary() {
                 if (data.bracket) currentBracket = data.bracket;
                 if (data.clubs) clubs = data.clubs;
                 if (data.players) players = data.players;
+                if (data.clips) clips = data.clips;
+                if (data.stats) stats = data.stats;
                 
                 console.log('☁️ Datos restaurados desde Cloudinary exitosamente');
                 return true;

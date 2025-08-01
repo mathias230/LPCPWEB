@@ -638,32 +638,66 @@ async function updatePlayerQuick(playerId, updates) {
 
 // Eliminar jugador (versión rápida)
 function deletePlayerQuick(playerId) {
-    const player = players.find(p => p.id === playerId);
-    if (!player) return;
+    console.log('🗑️ deletePlayerQuick llamada con playerId:', playerId, 'tipo:', typeof playerId);
+    console.log('📊 Array de jugadores actual:', players);
     
+    // Convertir playerId a número si es string
+    const numericPlayerId = typeof playerId === 'string' ? parseInt(playerId) : playerId;
+    console.log('🔢 PlayerId convertido a:', numericPlayerId, 'tipo:', typeof numericPlayerId);
+    
+    const player = players.find(p => {
+        console.log('Comparando:', p.id, 'tipo:', typeof p.id, 'con', numericPlayerId, 'tipo:', typeof numericPlayerId);
+        return p.id === numericPlayerId;
+    });
+    console.log('🔍 Jugador encontrado:', player);
+    
+    if (!player) {
+        console.error('❌ Jugador no encontrado con ID:', playerId);
+        showNotification('Jugador no encontrado', 'error');
+        return;
+    }
+    
+    console.log('❓ Mostrando diálogo de confirmación...');
     if (confirm(`¿Estás seguro de que quieres eliminar a "${player.name}"?`)) {
-        deletePlayerFromAPI(playerId);
+        console.log('✅ Usuario confirmó eliminación, llamando deletePlayerFromAPI...');
+        deletePlayerFromAPI(numericPlayerId);
+    } else {
+        console.log('❌ Usuario canceló eliminación');
     }
 }
 
 // Eliminar jugador de la API
 async function deletePlayerFromAPI(playerId) {
+    console.log('🌐 deletePlayerFromAPI iniciada con playerId:', playerId);
+    
     try {
+        console.log('📞 Haciendo llamada DELETE a /api/players/' + playerId);
         const response = await fetch(`/api/players/${playerId}`, {
             method: 'DELETE'
         });
         
+        console.log('📝 Respuesta recibida:', response.status, response.statusText);
+        
         if (!response.ok) {
-            throw new Error('Error al eliminar jugador');
+            const errorData = await response.text();
+            console.error('❌ Error en respuesta del servidor:', errorData);
+            throw new Error('Error al eliminar jugador: ' + response.status);
         }
         
+        console.log('✅ Jugador eliminado del servidor, actualizando array local...');
+        const originalLength = players.length;
         players = players.filter(p => p.id !== playerId);
+        console.log(`📊 Array actualizado: ${originalLength} -> ${players.length} jugadores`);
+        
+        console.log('🔄 Recargando lista de jugadores del equipo...');
         loadTeamPlayers(selectedTeamId);
+        
         showNotification('Jugador eliminado exitosamente', 'success');
+        console.log('✅ Eliminación completada exitosamente');
         
     } catch (error) {
-        console.error('Error deleting player:', error);
-        showNotification('Error al eliminar jugador', 'error');
+        console.error('❌ Error completo al eliminar jugador:', error);
+        showNotification('Error al eliminar jugador: ' + error.message, 'error');
     }
 }
 
@@ -2307,3 +2341,178 @@ async function deleteClip(clipId) {
         showNotification('Error de conexión al eliminar clip', 'error');
     }
 }
+
+// Función para poblar selects de clubes (función faltante)
+function populateClubSelects() {
+    // Esta función se llama cuando se cambia a la pestaña de jugadores
+    // No es necesaria en el diseño actual ya que usamos pestañas por equipo
+    console.log('populateClubSelects llamada - no es necesaria en el diseño actual');
+}
+
+// Función para editar equipo (función faltante)
+function editTeam(teamId) {
+    console.log('Función editTeam no implementada para teamId:', teamId);
+    showNotification('Función de editar equipo no disponible', 'info');
+}
+
+// Editar jugador (versión rápida)
+function editPlayerQuick(playerId) {
+    const player = players.find(p => p.id === playerId);
+    if (!player) {
+        showNotification('Jugador no encontrado', 'error');
+        return;
+    }
+    
+    // Crear un modal simple para editar el jugador
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+    `;
+    
+    modal.innerHTML = `
+        <div style="background: #1a1a1a; border: 1px solid #00ff88; border-radius: 12px; padding: 30px; width: 400px; max-width: 90vw;">
+            <h3 style="color: #00ff88; margin-bottom: 20px; text-align: center;">Editar Jugador</h3>
+            
+            <div style="margin-bottom: 15px;">
+                <label style="color: white; display: block; margin-bottom: 5px;">Nombre:</label>
+                <input type="text" id="editPlayerName" value="${player.name}" style="width: 100%; padding: 8px; border: 1px solid #333; background: #2a2a2a; color: white; border-radius: 4px;">
+            </div>
+            
+            <div style="margin-bottom: 15px;">
+                <label style="color: white; display: block; margin-bottom: 5px;">Edad:</label>
+                <input type="number" id="editPlayerAge" value="${player.age || ''}" min="16" max="50" style="width: 100%; padding: 8px; border: 1px solid #333; background: #2a2a2a; color: white; border-radius: 4px;">
+            </div>
+            
+            <div style="margin-bottom: 15px;">
+                <label style="color: white; display: block; margin-bottom: 5px;">Número:</label>
+                <input type="number" id="editPlayerNumber" value="${player.number || ''}" min="1" max="99" style="width: 100%; padding: 8px; border: 1px solid #333; background: #2a2a2a; color: white; border-radius: 4px;">
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+                <label style="color: white; display: block; margin-bottom: 5px;">Posición:</label>
+                <select id="editPlayerPosition" style="width: 100%; padding: 8px; border: 1px solid #333; background: #2a2a2a; color: white; border-radius: 4px;">
+                    <option value="Portero" ${player.position === 'Portero' ? 'selected' : ''}>Portero</option>
+                    <option value="Defensa Central" ${player.position === 'Defensa Central' ? 'selected' : ''}>Defensa Central</option>
+                    <option value="Lateral Derecho" ${player.position === 'Lateral Derecho' ? 'selected' : ''}>Lateral Derecho</option>
+                    <option value="Lateral Izquierdo" ${player.position === 'Lateral Izquierdo' ? 'selected' : ''}>Lateral Izquierdo</option>
+                    <option value="Mediocentro" ${player.position === 'Mediocentro' ? 'selected' : ''}>Mediocentro</option>
+                    <option value="Mediocentro Defensivo" ${player.position === 'Mediocentro Defensivo' ? 'selected' : ''}>Mediocentro Defensivo</option>
+                    <option value="Mediocentro Ofensivo" ${player.position === 'Mediocentro Ofensivo' ? 'selected' : ''}>Mediocentro Ofensivo</option>
+                    <option value="Extremo Derecho" ${player.position === 'Extremo Derecho' ? 'selected' : ''}>Extremo Derecho</option>
+                    <option value="Extremo Izquierdo" ${player.position === 'Extremo Izquierdo' ? 'selected' : ''}>Extremo Izquierdo</option>
+                    <option value="Delantero" ${player.position === 'Delantero' ? 'selected' : ''}>Delantero</option>
+                </select>
+            </div>
+            
+            <div style="display: flex; gap: 10px; justify-content: center;">
+                <button onclick="savePlayerEdit('${playerId}')" style="background: #00ff88; color: #000; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold;">
+                    Guardar
+                </button>
+                <button onclick="closeEditModal()" style="background: #666; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer;">
+                    Cancelar
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Funciones para el modal
+    window.savePlayerEdit = async function(playerId) {
+        const name = document.getElementById('editPlayerName').value.trim();
+        const age = parseInt(document.getElementById('editPlayerAge').value);
+        const number = parseInt(document.getElementById('editPlayerNumber').value);
+        const position = document.getElementById('editPlayerPosition').value;
+        
+        if (!name) {
+            showNotification('El nombre es obligatorio', 'error');
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/api/players/${playerId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    name,
+                    age: age || null,
+                    number: number || null,
+                    position
+                })
+            });
+            
+            if (response.ok) {
+                // Actualizar el jugador en el array local
+                const playerIndex = players.findIndex(p => p.id === playerId);
+                if (playerIndex !== -1) {
+                    players[playerIndex] = { ...players[playerIndex], name, age, number, position };
+                }
+                
+                loadTeamPlayers(selectedTeamId);
+                showNotification('Jugador actualizado exitosamente', 'success');
+                closeEditModal();
+            } else {
+                const error = await response.json();
+                showNotification(error.error || 'Error al actualizar jugador', 'error');
+            }
+        } catch (error) {
+            console.error('Error updating player:', error);
+            showNotification('Error de conexión', 'error');
+        }
+    };
+    
+    window.closeEditModal = function() {
+        document.body.removeChild(modal);
+        delete window.savePlayerEdit;
+        delete window.closeEditModal;
+    };
+}
+
+// ==================== FUNCIONES GLOBALES ====================
+// Exponer funciones necesarias para los botones onclick
+
+// Funciones de jugadores
+window.deletePlayerQuick = deletePlayerQuick;
+window.editPlayerQuick = editPlayerQuick;
+
+// Funciones de equipos
+window.deleteTeam = deleteTeam;
+window.editTeam = editTeam;
+
+// Funciones auxiliares
+window.populateClubSelects = populateClubSelects;
+
+// Funciones de partidos
+window.deleteMatch = deleteMatch;
+window.updateMatchResult = updateMatchResult;
+
+// Funciones de clips
+window.deleteClip = deleteClip;
+
+// Funciones de configuración
+window.addClassificationZone = addClassificationZone;
+window.removeClassificationZone = removeClassificationZone;
+window.saveTableConfig = saveTableConfig;
+window.saveTournamentConfig = saveTournamentConfig;
+
+// Funciones de playoffs
+window.generateBracket = generateBracket;
+window.saveBracketResult = saveBracketResult;
+
+// Funciones de navegación
+window.changeMatchday = changeMatchday;
+window.switchTab = switchTab;
+window.logout = logout;
+
+console.log('✅ Funciones globales expuestas correctamente');

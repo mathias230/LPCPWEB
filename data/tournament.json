@@ -421,5 +421,30 @@
       "logo": "/img/West Side PTY.jpg"
     }
   ],
-  "players": []
+  "players": [
+    {
+      "id": 1753991614452,
+      "name": "ss",
+      "clubId": 1,
+      "clubName": "ACP 507",
+      "position": "Jugador",
+      "age": 25,
+      "number": 2,
+      "nationality": "Panamá",
+      "photo": "",
+      "registeredAt": "2025-07-31T19:53:34.452Z"
+    },
+    {
+      "id": 1753991935683,
+      "name": "ss",
+      "clubId": 1,
+      "clubName": "ACP 507",
+      "position": "Jugador",
+      "age": 25,
+      "number": 3,
+      "nationality": "Panamá",
+      "photo": "",
+      "registeredAt": "2025-07-31T19:58:55.683Z"
+    }
+  ]
 }
