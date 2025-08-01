@@ -1,252 +1,7 @@
 {
-  "teams": [
-    {
-      "id": 1,
-      "name": "ACP 507",
-      "founded": 2020,
-      "stadium": "Estadio ACP"
-    },
-    {
-      "id": 2,
-      "name": "BKS FC",
-      "founded": 2023,
-      "stadium": "BKS Stadium"
-    },
-    {
-      "id": 3,
-      "name": "Coiner FC",
-      "founded": 2019,
-      "stadium": "Campo Coiner"
-    },
-    {
-      "id": 4,
-      "name": "FC WEST SIDE",
-      "founded": 2021,
-      "stadium": "West Side Arena"
-    },
-    {
-      "id": 5,
-      "name": "Humacao FC",
-      "founded": 2020,
-      "stadium": "Estadio Humacao"
-    },
-    {
-      "id": 6,
-      "name": "Jumpers FC",
-      "founded": 2022,
-      "stadium": "Jumpers Arena"
-    },
-    {
-      "id": 7,
-      "name": "LOS PLEBES Tk",
-      "founded": 2021,
-      "stadium": "Estadio Los Plebes"
-    },
-    {
-      "id": 8,
-      "name": "Punta Coco FC",
-      "founded": 2018,
-      "stadium": "Punta Coco Field"
-    },
-    {
-      "id": 9,
-      "name": "Pura Vibra",
-      "founded": 2022,
-      "stadium": "Vibra Stadium"
-    },
-    {
-      "id": 10,
-      "name": "Rayos X FC",
-      "founded": 2020,
-      "stadium": "Rayos Stadium"
-    },
-    {
-      "id": 11,
-      "name": "Tiki Taka FC",
-      "founded": 2021,
-      "stadium": "Tiki Taka Field"
-    },
-    {
-      "id": 12,
-      "name": "WEST SIDE PTY",
-      "founded": 2023,
-      "stadium": "West Side Stadium"
-    }
-  ],
-  "matches": [
-    {
-      "id": 1753728157094,
-      "homeTeam": "BKS FC",
-      "awayTeam": "Rayos X FC",
-      "date": "2025-07-27",
-      "time": "19:00",
-      "matchday": 1,
-      "status": "finished",
-      "homeScore": 2,
-      "awayScore": 1
-    },
-    {
-      "id": 1754054873403,
-      "homeTeam": "ACP 507",
-      "awayTeam": "BKS FC",
-      "homeTeamId": 1,
-      "awayTeamId": 2,
-      "homeTeamLogo": "img/default-team.png",
-      "awayTeamLogo": "img/default-team.png",
-      "date": "2000-11-11",
-      "time": "11:11",
-      "matchday": 1,
-      "status": "finished",
-      "homeScore": 3,
-      "awayScore": 1
-    }
-  ],
-  "standings": [
-    {
-      "team": "ACP 507",
-      "played": 1,
-      "won": 1,
-      "drawn": 0,
-      "lost": 0,
-      "goalsFor": 3,
-      "goalsAgainst": 1,
-      "goalDifference": 2,
-      "points": 3,
-      "position": 1
-    },
-    {
-      "team": "BKS FC",
-      "played": 2,
-      "won": 1,
-      "drawn": 0,
-      "lost": 1,
-      "goalsFor": 3,
-      "goalsAgainst": 4,
-      "goalDifference": -1,
-      "points": 3,
-      "position": 2
-    },
-    {
-      "team": "Coiner FC",
-      "played": 0,
-      "won": 0,
-      "drawn": 0,
-      "lost": 0,
-      "goalsFor": 0,
-      "goalsAgainst": 0,
-      "goalDifference": 0,
-      "points": 0,
-      "position": 3
-    },
-    {
-      "team": "FC WEST SIDE",
-      "played": 0,
-      "won": 0,
-      "drawn": 0,
-      "lost": 0,
-      "goalsFor": 0,
-      "goalsAgainst": 0,
-      "goalDifference": 0,
-      "points": 0,
-      "position": 4
-    },
-    {
-      "team": "Humacao FC",
-      "played": 0,
-      "won": 0,
-      "drawn": 0,
-      "lost": 0,
-      "goalsFor": 0,
-      "goalsAgainst": 0,
-      "goalDifference": 0,
-      "points": 0,
-      "position": 5
-    },
-    {
-      "team": "Jumpers FC",
-      "played": 0,
-      "won": 0,
-      "drawn": 0,
-      "lost": 0,
-      "goalsFor": 0,
-      "goalsAgainst": 0,
-      "goalDifference": 0,
-      "points": 0,
-      "position": 6
-    },
-    {
-      "team": "LOS PLEBES Tk",
-      "played": 0,
-      "won": 0,
-      "drawn": 0,
-      "lost": 0,
-      "goalsFor": 0,
-      "goalsAgainst": 0,
-      "goalDifference": 0,
-      "points": 0,
-      "position": 7
-    },
-    {
-      "team": "Punta Coco FC",
-      "played": 0,
-      "won": 0,
-      "drawn": 0,
-      "lost": 0,
-      "goalsFor": 0,
-      "goalsAgainst": 0,
-      "goalDifference": 0,
-      "points": 0,
-      "position": 8
-    },
-    {
-      "team": "Pura Vibra",
-      "played": 0,
-      "won": 0,
-      "drawn": 0,
-      "lost": 0,
-      "goalsFor": 0,
-      "goalsAgainst": 0,
-      "goalDifference": 0,
-      "points": 0,
-      "position": 9
-    },
-    {
-      "team": "Tiki Taka FC",
-      "played": 0,
-      "won": 0,
-      "drawn": 0,
-      "lost": 0,
-      "goalsFor": 0,
-      "goalsAgainst": 0,
-      "goalDifference": 0,
-      "points": 0,
-      "position": 10
-    },
-    {
-      "team": "WEST SIDE PTY",
-      "played": 0,
-      "won": 0,
-      "drawn": 0,
-      "lost": 0,
-      "goalsFor": 0,
-      "goalsAgainst": 0,
-      "goalDifference": 0,
-      "points": 0,
-      "position": 11
-    },
-    {
-      "team": "Rayos X FC",
-      "played": 1,
-      "won": 0,
-      "drawn": 0,
-      "lost": 1,
-      "goalsFor": 1,
-      "goalsAgainst": 2,
-      "goalDifference": -1,
-      "points": 0,
-      "position": 12
-    }
-  ],
+  "teams": [],
+  "matches": [],
+  "standings": [],
   "settings": {
     "seasonName": "Temporada 2025",
     "pointsWin": 3,
@@ -368,88 +123,34 @@
   ],
   "players": [
     {
-      "id": 1754054764324,
-      "name": "JavixPro76",
-      "clubId": 1,
-      "clubName": "ACP 507",
+      "id": 1754065150137,
+      "name": "sdsdsd",
+      "clubId": 1754065116025,
+      "clubName": "cc",
       "position": "Jugador",
       "age": 25,
       "number": 1,
       "nationality": "Panamá",
       "photo": "",
-      "registeredAt": "2025-08-01T13:26:04.324Z"
+      "registeredAt": "2025-08-01T16:19:10.137Z",
+      "goals": 2,
+      "assists": 1,
+      "updatedAt": "2025-08-01T16:19:14.876Z"
     },
     {
-      "id": 1754054773335,
-      "name": "MossakFonseca11",
-      "clubId": 1,
-      "clubName": "ACP 507",
+      "id": 1754065151703,
+      "name": "sdsd",
+      "clubId": 1754065128432,
+      "clubName": "ff",
       "position": "Jugador",
       "age": 25,
-      "number": 2,
+      "number": 1,
       "nationality": "Panamá",
       "photo": "",
-      "registeredAt": "2025-08-01T13:26:13.335Z"
-    },
-    {
-      "id": 1754054782215,
-      "name": "locoyose1991",
-      "clubId": 1,
-      "clubName": "ACP 507",
-      "position": "Jugador",
-      "age": 25,
-      "number": 3,
-      "nationality": "Panamá",
-      "photo": "",
-      "registeredAt": "2025-08-01T13:26:22.215Z"
-    },
-    {
-      "id": 1754054791694,
-      "name": "JACO12606",
-      "clubId": 1,
-      "clubName": "ACP 507",
-      "position": "Jugador",
-      "age": 25,
-      "number": 4,
-      "nationality": "Panamá",
-      "photo": "",
-      "registeredAt": "2025-08-01T13:26:31.694Z"
-    },
-    {
-      "id": 1754054796742,
-      "name": "caloty1985",
-      "clubId": 1,
-      "clubName": "ACP 507",
-      "position": "Jugador",
-      "age": 25,
-      "number": 5,
-      "nationality": "Panamá",
-      "photo": "",
-      "registeredAt": "2025-08-01T13:26:36.742Z"
-    },
-    {
-      "id": 1754054800862,
-      "name": "luisjesus100",
-      "clubId": 1,
-      "clubName": "ACP 507",
-      "position": "Jugador",
-      "age": 25,
-      "number": 6,
-      "nationality": "Panamá",
-      "photo": "",
-      "registeredAt": "2025-08-01T13:26:40.862Z"
-    },
-    {
-      "id": 1754054808798,
-      "name": "Narutopoder1123",
-      "clubId": 1,
-      "clubName": "ACP 507",
-      "position": "Jugador",
-      "age": 25,
-      "number": 7,
-      "nationality": "Panamá",
-      "photo": "",
-      "registeredAt": "2025-08-01T13:26:48.798Z"
+      "registeredAt": "2025-08-01T16:19:11.703Z",
+      "goals": 1,
+      "assists": 1,
+      "updatedAt": "2025-08-01T16:19:20.238Z"
     }
   ],
   "clips": [],

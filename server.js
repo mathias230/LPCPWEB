@@ -1175,17 +1175,6 @@ app.post('/api/teams', uploadImage.single('logo'), async (req, res) => {
         teams.push(newTeam);
         tournament.teams.push(tournamentTeam);
         
-        // También crear automáticamente como club
-        const newClub = {
-            id: `club_${teamId}`,
-            name: cleanName,
-            description: `Club de fútbol ${cleanName}`,
-            founded: new Date().getFullYear(),
-            players: 0,
-            logo: logoUrl
-        };
-        clubs.push(newClub);
-        
         // Recalcular tabla de posiciones
         updateStandingsFromMatches();
         saveData();
@@ -1193,7 +1182,7 @@ app.post('/api/teams', uploadImage.single('logo'), async (req, res) => {
         // Emitir actualizaciones en tiempo real
         io.emit('teamsUpdate', teams);
         io.emit('standingsUpdate', standings);
-        io.emit('clubsUpdate', clubs);
+        // Nota: Ya no emitimos clubsUpdate porque equipos y clubes son independientes
         
         res.json({ success: true, team: newTeam });
     } catch (error) {
@@ -1310,55 +1299,30 @@ let clubs = [];
 // Variable global para almacenar jugadores
 let players = [];
 
-// Inicializar clubes basados en los equipos del torneo
-function initializeClubs() {
-    if (!clubs || clubs.length === 0) {
-        // Crear clubes basados en todos los equipos del torneo
-        clubs = teams.map(team => {
-            // Generar descripción personalizada para cada equipo
-            const descriptions = {
-                "ACP 507": "Representando la tradición canalera con orgullo y determinación.",
-                "BKS FC": "Fuerza y determinación caracterizan a este equipo competitivo.",
-                "Coiner FC": "Estrategia y precisión definen el estilo de juego de este equipo.",
-                "FC WEST SIDE": "Desde el oeste de Panamá, con pasión y técnica incomparable.",
-                "Humacao FC": "Tradición y garra desde Humacao, siempre luchando por la victoria.",
-                "Jumpers FC": "Agilidad y velocidad son las armas de este dinámico equipo.",
-                "LOS PLEBES Tk": "Juventud y energía desbordante en cada jugada del partido.",
-                "Punta Coco FC": "Desde la costa, con el espíritu del mar y la determinación.",
-                "Pura Vibra": "Energía pura y pasión desmedida en cada encuentro deportivo.",
-                "Rayos X FC": "Precisión quirúrgica y visión de juego excepcional.",
-                "Tiki Taka FC": "Maestros del pase corto y el juego de posesión.",
-                "WEST SIDE PTY": "Representando el oeste con orgullo y técnica depurada."
-            };
-            
-            // Generar logos basados en nombres existentes (todos los equipos)
-            const logos = {
-                "ACP 507": "/img/APC 507.png",
-                "BKS FC": "/img/BKS FC.jpg",
-                "Coiner FC": "/img/Coiner FC.jpg",
-                "FC WEST SIDE": "/img/West side.jpg",
-                "Humacao FC": "/img/Humacao fc.jpg",
-                "Jumpers FC": "/img/Jumpers FC.jpg",
-                "LOS PLEBES Tk": "/img/Los Plebes.jpg",
-                "Punta Coco FC": "/img/Punta Coco FC.png",
-                "Pura Vibra": "/img/Pura vibra.png",
-                "Rayos X FC": "/img/Rayos x FC.jpg",
-                "Tiki Taka FC": "/img/Tiki taka FC.jpg",
-                "WEST SIDE PTY": "/img/West Side PTY.jpg"
-            };
-            
-            return {
-                id: team.id,
-                name: team.name,
-                description: descriptions[team.name] || `Club de fútbol ${team.name}, comprometido con la excelencia deportiva.`,
-                founded: team.founded,
-                players: Math.floor(Math.random() * 8) + 11, // Entre 11 y 18 jugadores
-                logo: logos[team.name] || '' // Logo vacío si no existe
-            };
-        });
-        
-        console.log(`✅ Clubes inicializados: ${clubs.length} clubes basados en equipos del torneo`);
+// FUNCIÓN ELIMINADA: initializeClubs() - Equipos y clubes son ahora completamente independientes
+
+// ==================== ANTI-SYNC BLOCKER ====================
+// MECANISMO DE BLOQUEO PARA EVITAR SINCRONIZACIÓN AUTOMÁTICA
+let BLOCK_AUTO_CLUB_CREATION = true;
+let TEAMS_CLUBS_INDEPENDENT = true;
+
+// Función para verificar si se debe bloquear la creación automática de clubes
+function shouldBlockAutoClubCreation() {
+    if (BLOCK_AUTO_CLUB_CREATION) {
+        console.log('🚫 BLOQUEANDO creación automática de clubes - Equipos y clubes son independientes');
+        return true;
     }
+    return false;
+}
+
+// Función para prevenir cualquier sincronización automática
+function preventAutoSync(operation, data) {
+    if (TEAMS_CLUBS_INDEPENDENT) {
+        console.log(`🚫 BLOQUEANDO sincronización automática para operación: ${operation}`);
+        console.log('📋 Equipos y clubes son entidades completamente independientes');
+        return true;
+    }
+    return false;
 }
 
 // ==================== PLAYERS API ====================
@@ -1476,7 +1440,6 @@ app.post('/api/players', uploadImage.single('playerPhoto'), async (req, res) => 
 // Obtener lista de clubes
 app.get('/api/clubs', (req, res) => {
     try {
-        initializeClubs();
         res.json(clubs);
     } catch (error) {
         console.error('Error al obtener clubes:', error);
@@ -1582,7 +1545,7 @@ app.post('/api/clubs', uploadImage.single('clubLogo'), async (req, res) => {
             }
         }
         
-        initializeClubs();
+        // initializeClubs() ELIMINADO - equipos y clubes son independientes
         
         const newClub = {
             id: Math.max(...clubs.map(c => c.id), 0) + 1,
@@ -1650,8 +1613,6 @@ app.put('/api/clubs/:id', uploadImage.single('clubLogo'), async (req, res) => {
     try {
         const clubId = parseInt(req.params.id);
         const { clubName, clubDescription, clubFounded, clubPlayers } = req.body;
-        
-        initializeClubs();
         const clubIndex = clubs.findIndex(c => c.id === clubId);
         
         if (clubIndex === -1) {
@@ -1742,8 +1703,6 @@ app.put('/api/clubs/:id', uploadImage.single('clubLogo'), async (req, res) => {
 app.delete('/api/clubs/:id', async (req, res) => {
     try {
         const clubId = parseInt(req.params.id);
-        
-        initializeClubs();
         const clubIndex = clubs.findIndex(c => c.id === clubId);
         
         if (clubIndex === -1) {
@@ -1777,8 +1736,8 @@ app.delete('/api/clubs/:id', async (req, res) => {
     }
 });
 
-// Inicializar clubes al arrancar el servidor
-initializeClubs();
+// Clubes y equipos son ahora independientes - no se inicializan automáticamente
+// initializeClubs(); // DESHABILITADO - equipos y clubes son independientes
 
 // ==================== PLAYERS API ====================
 

@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Teams</title>
+</head>
+<body>
+    <div id="teamsGrid"></div>
+    
+    <script>
+        // Datos de prueba
+        const teams = [
+            { id: 1, name: "Test Team 1", logo: null },
+            { id: 2, name: "Test Team 2", logo: null }
+        ];
+        
+        // Funciones simples
+        function editTeam(teamId) {
+            alert(`Editando equipo ${teamId}`);
+        }
+        
+        function deleteTeam(teamId) {
+            alert(`Eliminando equipo ${teamId}`);
+        }
+        
+        // Renderizar
+        function renderTeams() {
+            const teamsGrid = document.getElementById('teamsGrid');
+            teamsGrid.innerHTML = '';
+            
+            teams.forEach(team => {
+                const teamCard = document.createElement('div');
+                teamCard.style.cssText = `
+                    background: #f0f0f0;
+                    border: 1px solid #ccc;
+                    padding: 20px;
+                    margin: 10px;
+                    border-radius: 8px;
+                `;
+                
+                teamCard.innerHTML = `
+                    <h3>${team.name}</h3>
+                    <button onclick="editTeam(${team.id})" style="background: blue; color: white; padding: 10px; margin: 5px;">
+                        Editar
+                    </button>
+                    <button onclick="deleteTeam(${team.id})" style="background: red; color: white; padding: 10px; margin: 5px;">
+                        Eliminar
+                    </button>
+                `;
+                teamsGrid.appendChild(teamCard);
+            });
+        }
+        
+        // Ejecutar al cargar
+        window.onload = function() {
+            renderTeams();
+        };
+    </script>
+</body>
+</html>

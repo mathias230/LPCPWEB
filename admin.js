@@ -7,13 +7,67 @@ document.addEventListener('DOMContentLoaded', function() {
     loadInitialData();
     initializeWebSocket(); // Inicializar WebSocket para sincronización
     
-    console.log('✅ Panel de administración inicializado');
+    console.log(' Panel de administración inicializado');
 });
 
 // Global variables
 let teams = [];
-let matches = [];
+let clubs = [];
 let players = [];
+
+// Funciones de equipos (disponibles globalmente desde el inicio)
+window.editTeam = function(teamId) {
+    const team = teams.find(t => t.id === teamId);
+    if (!team) return;
+    
+    // Llenar formulario con datos del equipo
+    document.getElementById('teamId').value = team.id;
+    document.getElementById('teamName').value = team.name;
+    
+    // Cambiar texto del botón y mostrar cancelar
+    document.getElementById('teamFormAction').textContent = 'Actualizar Equipo';
+    document.getElementById('cancelTeamBtn').style.display = 'inline-block';
+    
+    // Scroll al formulario
+    document.getElementById('teamForm').scrollIntoView({ behavior: 'smooth' });
+};
+
+window.cancelTeamEdit = function() {
+    // Limpiar formulario
+    document.getElementById('teamForm').reset();
+    document.getElementById('teamId').value = '';
+    
+    // Restaurar texto del botón y ocultar cancelar
+    document.getElementById('teamFormAction').textContent = 'Agregar Equipo';
+    document.getElementById('cancelTeamBtn').style.display = 'none';
+};
+
+window.deleteTeam = async function(teamId) {
+    const team = teams.find(t => t.id === teamId);
+    if (!team) return;
+    
+    if (!confirm(`¿Estás seguro de que quieres eliminar el equipo "${team.name}"?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/teams/${teamId}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            showNotification(`Equipo "${team.name}" eliminado exitosamente`, 'success');
+            await loadTeams(); // Recargar lista
+        } else {
+            const error = await response.json();
+            showNotification(error.error || 'Error eliminando equipo', 'error');
+        }
+    } catch (error) {
+        console.error('Error deleting team:', error);
+        showNotification('Error de conexión', 'error');
+    }
+};
+let matches = [];
 let currentTab = 'teams';
 let editingPlayerId = null;
 let socket = null;
@@ -134,6 +188,11 @@ function switchTab(tabId) {
     switch(tabId) {
         case 'teams':
             loadTeams();
+            // Solución directa y simple
+            setTimeout(() => {
+                console.log('🚀 SOLUCIÓN DIRECTA: Agregando botones...');
+                addEditButtonsToTeams();
+            }, 500);
             break;
         case 'clubs':
             loadClubs();
@@ -171,6 +230,7 @@ function switchTab(tabId) {
 async function loadInitialData() {
     try {
         await loadTeams();
+        await loadClubs();
         await loadMatches();
         populateTeamSelects();
     } catch (error) {
@@ -178,6 +238,263 @@ async function loadInitialData() {
         showNotification('Error cargando datos iniciales', 'error');
     }
 }
+
+// ==================== SIMPLE TEAMS LOGO MANAGEMENT ====================
+
+async function loadTeams() {
+    try {
+        const response = await fetch('/api/teams');
+        if (!response.ok) throw new Error('Error fetching teams');
+        
+        teams = await response.json();
+        console.log('🎯 DEBUG: Equipos obtenidos:', teams.length, teams);
+        console.log('🎯 DEBUG: Llamando forceRenderTeams()...');
+        forceRenderTeams();
+        console.log('✅ Equipos cargados para cambio de logo:', teams.length);
+    } catch (error) {
+        console.error('Error loading teams:', error);
+        teams = [];
+        renderTeams();
+    }
+}
+
+function renderTeams() {
+    console.log('🔴 RENDERTEAMS: Iniciando renderizado...');
+    const teamsGrid = document.getElementById('teamsGrid');
+    console.log('🔴 RENDERTEAMS: teamsGrid encontrado:', !!teamsGrid);
+    
+    if (!teamsGrid) {
+        console.error('❌ RENDERTEAMS: teamsGrid NO encontrado!');
+        return;
+    }
+
+    teamsGrid.innerHTML = '';
+    console.log('🔴 RENDERTEAMS: teamsGrid limpiado');
+
+    if (!teams || teams.length === 0) {
+        console.log('⚠️ RENDERTEAMS: No hay equipos');
+        teamsGrid.innerHTML = `
+            <div style="text-align: center; color: rgba(255,255,255,0.6); padding: 40px;">
+                <i class="fas fa-users" style="font-size: 48px; margin-bottom: 20px; opacity: 0.3;"></i>
+                <p>No hay equipos registrados. Agrega el primer equipo usando el formulario de arriba.</p>
+            </div>
+        `;
+        return;
+    }
+
+    console.log('🔴 RENDERTEAMS: Renderizando', teams.length, 'equipos');
+    
+    // Crear HTML directamente como string (más simple)
+    let html = '';
+    teams.forEach((team, index) => {
+        console.log(`🏆 RENDERTEAMS: Procesando equipo ${index + 1}:`, team.name);
+        
+        html += `
+            <div style="
+                background: rgba(255, 255, 255, 0.05);
+                border: 2px solid rgba(0, 255, 136, 0.2);
+                border-radius: 12px;
+                padding: 20px;
+                margin-bottom: 20px;
+                display: flex;
+                align-items: center;
+                gap: 20px;
+            ">
+                <div style="width: 60px; height: 60px; border-radius: 8px; overflow: hidden; background: rgba(0,255,136,0.1); display: flex; align-items: center; justify-content: center;">
+                    ${team.logo ? 
+                        `<img src="${team.logo}" alt="${team.name} Logo" style="width: 100%; height: 100%; object-fit: cover;">` :
+                        `<i class="fas fa-users" style="color: #00ff88; font-size: 24px;"></i>`
+                    }
+                </div>
+                <div style="flex: 1;">
+                    <h3 style="color: #00ff88; margin: 0; font-size: 18px;">${team.name}</h3>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="window.editTeam(${team.id})" style="background: linear-gradient(45deg, #3498db, #2980b9); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px;">
+                        <i class="fas fa-edit"></i> Editar
+                    </button>
+                    <button onclick="window.deleteTeam(${team.id})" style="background: linear-gradient(45deg, #e74c3c, #c0392b); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px;">
+                        <i class="fas fa-trash"></i> Eliminar
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+    
+    teamsGrid.innerHTML = html;
+    console.log('✅ RENDERTEAMS: Renderizado completado!');
+}
+
+function changeTeamLogo(teamId) {
+    const team = teams.find(t => t.id === teamId);
+    if (!team) return;
+    
+    // Crear input file temporal
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = 'image/*';
+    fileInput.style.display = 'none';
+    
+    fileInput.onchange = async function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        const formData = new FormData();
+        formData.append('teamName', team.name);
+        formData.append('logo', file);
+        
+        try {
+            const response = await fetch(`/api/teams/${teamId}`, {
+                method: 'PUT',
+                body: formData
+            });
+            
+            if (response.ok) {
+                showNotification(`Logo de ${team.name} actualizado exitosamente`, 'success');
+                await loadTeams(); // Recargar para mostrar el nuevo logo
+            } else {
+                const error = await response.json();
+                showNotification(error.error || 'Error actualizando logo', 'error');
+            }
+        } catch (error) {
+            console.error('Error updating team logo:', error);
+            showNotification('Error de conexión', 'error');
+        }
+        
+        // Limpiar el input
+        document.body.removeChild(fileInput);
+    };
+    
+    document.body.appendChild(fileInput);
+    fileInput.click();
+}
+
+// Funciones de edición de equipos
+function editTeam(teamId) {
+    const team = teams.find(t => t.id === teamId);
+    if (!team) return;
+    
+    // Llenar formulario con datos del equipo
+    document.getElementById('teamId').value = team.id;
+    document.getElementById('teamName').value = team.name;
+    
+    // Cambiar texto del botón y mostrar cancelar
+    document.getElementById('teamFormAction').textContent = 'Actualizar Equipo';
+    document.getElementById('cancelTeamBtn').style.display = 'inline-block';
+    
+    // Scroll al formulario
+    document.getElementById('teamForm').scrollIntoView({ behavior: 'smooth' });
+}
+
+// Función para cancelar edición de equipo
+function cancelTeamEdit() {
+    // Limpiar formulario
+    document.getElementById('teamForm').reset();
+    document.getElementById('teamId').value = '';
+    
+    // Restaurar texto del botón y ocultar cancelar
+    document.getElementById('teamFormAction').textContent = 'Agregar Equipo';
+    document.getElementById('cancelTeamBtn').style.display = 'none';
+}
+
+// Función para eliminar equipo
+async function deleteTeam(teamId) {
+    const team = teams.find(t => t.id === teamId);
+    if (!team) return;
+    
+    if (!confirm(`¿Estás seguro de que quieres eliminar el equipo "${team.name}"?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/teams/${teamId}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            showNotification(`Equipo "${team.name}" eliminado exitosamente`, 'success');
+            await loadTeams(); // Recargar lista
+        } else {
+            const error = await response.json();
+            showNotification(error.error || 'Error eliminando equipo', 'error');
+        }
+    } catch (error) {
+        console.error('Error deleting team:', error);
+        showNotification('Error de conexión', 'error');
+    }
+}
+
+async function deleteTeam(teamId) {
+    const team = teams.find(t => t.id === teamId);
+    if (!team) return;
+    
+    if (!confirm(`¿Estás seguro de que quieres eliminar el equipo "${team.name}"?\n\nEsto también eliminará todos los jugadores del equipo.`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/teams/${teamId}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            showNotification('Equipo eliminado exitosamente', 'success');
+            await loadTeams();
+        } else {
+            const error = await response.json();
+            showNotification(error.error || 'Error eliminando equipo', 'error');
+        }
+    } catch (error) {
+        console.error('Error deleting team:', error);
+        showNotification('Error de conexión', 'error');
+    }
+}
+
+async function handleTeamSubmit(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(e.target);
+    const teamId = formData.get('teamId');
+    
+    // Validar datos
+    const teamName = formData.get('teamName').trim();
+    if (!teamName) {
+        showNotification('El nombre del equipo es requerido', 'error');
+        return;
+    }
+    
+    try {
+        const url = teamId ? `/api/teams/${teamId}` : '/api/teams';
+        const method = teamId ? 'PUT' : 'POST';
+        
+        const response = await fetch(url, {
+            method: method,
+            body: formData
+        });
+        
+        if (response.ok) {
+            const action = teamId ? 'actualizado' : 'agregado';
+            showNotification(`Equipo ${action} exitosamente`, 'success');
+            
+            // Limpiar formulario y recargar
+            e.target.reset();
+            cancelTeamEdit();
+            await loadTeams();
+        } else {
+            const error = await response.json();
+            showNotification(error.error || 'Error guardando equipo', 'error');
+        }
+    } catch (error) {
+        console.error('Error submitting team:', error);
+        showNotification('Error de conexión', 'error');
+    }
+}
+
+// Exponer funciones globalmente
+window.editTeam = editTeam;
+window.cancelTeamEdit = cancelTeamEdit;
+window.deleteTeam = deleteTeam;
+window.changeTeamLogo = changeTeamLogo;
 
 // ==================== CLUBS MANAGEMENT ====================
 
@@ -727,20 +1044,33 @@ async function deletePlayerFromAPI(playerId) {
 // Eliminar jugador (versión rápida)
 function deletePlayerQuick(playerId) {
     console.log('🗑️ deletePlayerQuick llamada con playerId:', playerId, 'tipo:', typeof playerId);
-    console.log('📊 Array de jugadores actual:', players);
+    console.log('📊 Array de jugadores del equipo actual:', teamPlayers);
+    console.log('📊 Array global de jugadores:', players);
     
     // Convertir playerId a número si es string
     const numericPlayerId = typeof playerId === 'string' ? parseInt(playerId) : playerId;
     console.log('🔢 PlayerId convertido a:', numericPlayerId, 'tipo:', typeof numericPlayerId);
     
-    const player = players.find(p => {
-        console.log('Comparando:', p.id, 'tipo:', typeof p.id, 'con', numericPlayerId, 'tipo:', typeof numericPlayerId);
-        return p.id === numericPlayerId;
+    // Buscar primero en teamPlayers (jugadores del equipo actual)
+    let player = teamPlayers.find(p => {
+        console.log('Comparando en teamPlayers:', p.id, 'tipo:', typeof p.id, 'con', numericPlayerId, 'tipo:', typeof numericPlayerId);
+        return p.id == numericPlayerId; // Usar == para comparación flexible
     });
+    
+    // Si no se encuentra en teamPlayers, buscar en el array global
+    if (!player) {
+        player = players.find(p => {
+            console.log('Comparando en players:', p.id, 'tipo:', typeof p.id, 'con', numericPlayerId, 'tipo:', typeof numericPlayerId);
+            return p.id == numericPlayerId; // Usar == para comparación flexible
+        });
+    }
+    
     console.log('🔍 Jugador encontrado:', player);
     
     if (!player) {
         console.error('❌ Jugador no encontrado con ID:', playerId);
+        console.error('❌ teamPlayers:', teamPlayers.map(p => ({ id: p.id, name: p.name })));
+        console.error('❌ players:', players.map(p => ({ id: p.id, name: p.name })));
         showNotification('Jugador no encontrado', 'error');
         return;
     }
@@ -794,9 +1124,6 @@ async function deletePlayerFromAPI(playerId) {
 
 
 // ==================== TEAMS MANAGEMENT ====================
-
-// Global variable for clubs
-let clubs = [];
 
 async function loadTeams() {
     try {
@@ -2848,6 +3175,12 @@ window.editPlayerQuick = editPlayerQuick;
 // Funciones de equipos
 window.deleteTeam = deleteTeam;
 window.editTeam = editTeam;
+window.cancelTeamEdit = cancelTeamEdit;
+
+// Funciones de clubes
+window.editClub = editClub;
+window.deleteClub = deleteClub;
+window.cancelClubEdit = cancelClubEdit;
 
 // Funciones auxiliares
 window.populateClubSelects = populateClubSelects;
@@ -3001,6 +3334,126 @@ async function cleanStandingsTable() {
 
 // Exponer la función globalmente
 window.cleanStandingsTable = cleanStandingsTable;
+
+// ============ FUNCIÓN PARA ELIMINAR EQUIPOS DE PRUEBA ============
+
+// Función para eliminar equipos específicos de prueba
+async function deleteTestTeams() {
+    const testTeamNames = ['ss', 'sss', 'sss ss', 'jjj', '123'];
+    let deletedCount = 0;
+    
+    console.log('🧹 Iniciando eliminación de equipos de prueba:', testTeamNames);
+    
+    try {
+        // Obtener lista actual de equipos
+        const response = await fetch('/api/teams');
+        if (!response.ok) {
+            throw new Error('No se pudo obtener la lista de equipos');
+        }
+        
+        const currentTeams = await response.json();
+        console.log('📊 Equipos actuales:', currentTeams.length);
+        
+        // Buscar y eliminar equipos de prueba
+        for (const team of currentTeams) {
+            if (testTeamNames.includes(team.name.toLowerCase().trim())) {
+                console.log(`🗑️ Eliminando equipo de prueba: "${team.name}" (ID: ${team.id})`);
+                
+                try {
+                    const deleteResponse = await fetch(`/api/teams/${team.id}`, {
+                        method: 'DELETE'
+                    });
+                    
+                    if (deleteResponse.ok) {
+                        console.log(`✅ Equipo "${team.name}" eliminado exitosamente`);
+                        deletedCount++;
+                    } else {
+                        console.error(`❌ Error eliminando equipo "${team.name}"`);
+                    }
+                } catch (deleteError) {
+                    console.error(`❌ Error eliminando equipo "${team.name}":`, deleteError);
+                }
+            }
+        }
+        
+        // Recargar equipos después de la limpieza
+        if (deletedCount > 0) {
+            console.log(`✅ Eliminación completada. ${deletedCount} equipos eliminados.`);
+            loadTeams(); // Recargar la lista
+            showNotification(`${deletedCount} equipos de prueba eliminados`, 'success');
+        } else {
+            console.log('ℹ️ No se encontraron equipos de prueba para eliminar');
+            showNotification('No se encontraron equipos de prueba', 'info');
+        }
+        
+    } catch (error) {
+        console.error('❌ Error en la limpieza de equipos:', error);
+        showNotification('Error al eliminar equipos de prueba', 'error');
+    }
+}
+
+// Exponer la función globalmente
+window.deleteTestTeams = deleteTestTeams;
+
+// ============ FUNCIÓN PARA ELIMINAR CLUBES HUÉRFANOS ============
+
+// Función para eliminar clubes específicos de prueba (huérfanos)
+async function deleteOrphanedClubs() {
+    const orphanedClubNames = ['ss', 'sss', 'sss ss', 'jjj', '123'];
+    let deletedCount = 0;
+    
+    console.log('🧹 Iniciando eliminación de clubes huérfanos:', orphanedClubNames);
+    
+    try {
+        // Obtener lista actual de clubes
+        const response = await fetch('/api/clubs');
+        if (!response.ok) {
+            throw new Error('No se pudo obtener la lista de clubes');
+        }
+        
+        const currentClubs = await response.json();
+        console.log('📊 Clubes actuales:', currentClubs.length);
+        
+        // Buscar y eliminar clubes huérfanos
+        for (const club of currentClubs) {
+            if (orphanedClubNames.includes(club.name.toLowerCase().trim())) {
+                console.log(`🗑️ Eliminando club huérfano: "${club.name}" (ID: ${club.id})`);
+                
+                try {
+                    const deleteResponse = await fetch(`/api/clubs/${club.id}`, {
+                        method: 'DELETE'
+                    });
+                    
+                    if (deleteResponse.ok) {
+                        console.log(`✅ Club "${club.name}" eliminado exitosamente`);
+                        deletedCount++;
+                    } else {
+                        console.error(`❌ Error eliminando club "${club.name}"`);
+                    }
+                } catch (deleteError) {
+                    console.error(`❌ Error eliminando club "${club.name}":`, deleteError);
+                }
+            }
+        }
+        
+        // Recargar clubes después de la limpieza
+        if (deletedCount > 0) {
+            console.log(`✅ Eliminación completada. ${deletedCount} clubes huérfanos eliminados.`);
+            loadClubs(); // Recargar la lista
+            showNotification(`${deletedCount} clubes huérfanos eliminados`, 'success');
+        } else {
+            console.log('ℹ️ No se encontraron clubes huérfanos para eliminar');
+            showNotification('No se encontraron clubes huérfanos', 'info');
+        }
+        
+    } catch (error) {
+        console.error('❌ Error en la limpieza de clubes:', error);
+        showNotification('Error al eliminar clubes huérfanos', 'error');
+    }
+}
+
+// Exponer la función globalmente
+window.deleteOrphanedClubs = deleteOrphanedClubs;
 
 // ============ VERIFICACIÓN OCR DE LISTAS DE JUGADORES ============
 
@@ -3360,11 +3813,143 @@ window.generateBracket = generateBracket;
 window.createCustomBracket = createCustomBracket;
 window.showCustomPairings = showCustomPairings;
 window.hideCustomPairings = hideCustomPairings;
-window.saveBracketResult = saveBracketResult;
+
+// Función de prueba para forzar renderizado
+function forceRenderTeams() {
+    console.log('🚀 FORZANDO RENDERIZADO DE EQUIPOS...');
+    console.log('🎯 Teams array:', teams);
+    
+    const teamsGrid = document.getElementById('teamsGrid');
+    console.log('🎯 TeamsGrid element:', teamsGrid);
+    
+    if (!teamsGrid) {
+        console.error('❌ ERROR: teamsGrid no encontrado!');
+        return;
+    }
+    
+    if (!teams || teams.length === 0) {
+        console.error('❌ ERROR: No hay equipos para renderizar!');
+        return;
+    }
+    
+    teamsGrid.innerHTML = '';
+    console.log('🧹 TeamsGrid limpiado');
+    
+    teams.forEach((team, index) => {
+        console.log(`🏆 Renderizando equipo ${index + 1}:`, team.name);
+        
+        const teamCard = document.createElement('div');
+        teamCard.style.cssText = `
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(0, 255, 136, 0.2);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        `;
+        
+        teamCard.innerHTML = `
+            <div style="width: 60px; height: 60px; border-radius: 8px; overflow: hidden; background: rgba(0,255,136,0.1); display: flex; align-items: center; justify-content: center;">
+                ${team.logo ? 
+                    `<img src="${team.logo}" alt="${team.name} Logo" style="width: 100%; height: 100%; object-fit: cover;">` :
+                    `<i class="fas fa-users" style="color: #00ff88; font-size: 24px;"></i>`
+                }
+            </div>
+            <div style="flex: 1;">
+                <h3 style="color: #00ff88; margin: 0; font-size: 18px;">${team.name}</h3>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button onclick="editTeam(${team.id})" style="background: linear-gradient(45deg, #3498db, #2980b9); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px;">
+                    <i class="fas fa-edit"></i> Editar
+                </button>
+                <button onclick="deleteTeam(${team.id})" style="background: linear-gradient(45deg, #e74c3c, #c0392b); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px;">
+                    <i class="fas fa-trash"></i> Eliminar
+                </button>
+            </div>
+        `;
+        teamsGrid.appendChild(teamCard);
+    });
+    
+    console.log('✅ RENDERIZADO FORZADO COMPLETADO!');
+}
 
 // Funciones de navegación
-window.changeMatchday = changeMatchday;
 window.switchTab = switchTab;
 window.logout = logout;
+window.forceRenderTeams = forceRenderTeams;
+
+// Función simple y directa para agregar botones
+function addEditButtonsToTeams() {
+    console.log('🔧 INICIANDO: addEditButtonsToTeams');
+    
+    const teamsGrid = document.getElementById('teamsGrid');
+    if (!teamsGrid) {
+        console.error('❌ teamsGrid no encontrado');
+        return;
+    }
+    
+    console.log('🔧 teamsGrid encontrado:', teamsGrid);
+    
+    // Buscar todas las tarjetas de equipos existentes
+    const teamCards = teamsGrid.children;
+    console.log('🔧 Tarjetas encontradas:', teamCards.length);
+    
+    if (teamCards.length === 0) {
+        console.log('⚠️ No hay tarjetas de equipos');
+        return;
+    }
+    
+    // Agregar botones a cada tarjeta
+    for (let i = 0; i < teamCards.length; i++) {
+        const card = teamCards[i];
+        console.log(`🔧 Procesando tarjeta ${i + 1}`);
+        
+        // Verificar si ya tiene botones
+        if (card.querySelector('.edit-buttons')) {
+            console.log(`ℹ️ Tarjeta ${i + 1} ya tiene botones`);
+            continue;
+        }
+        
+        // Crear contenedor de botones
+        const buttonsDiv = document.createElement('div');
+        buttonsDiv.className = 'edit-buttons';
+        buttonsDiv.style.cssText = 'display: flex !important; gap: 10px; margin-top: 15px; padding: 10px; background: rgba(255,0,0,0.1); border: 2px solid red; width: 100%; box-sizing: border-box; position: relative; z-index: 9999;';
+        
+        // Botón Editar
+        const editBtn = document.createElement('button');
+        editBtn.innerHTML = '<i class="fas fa-edit"></i> Editar';
+        editBtn.style.cssText = 'background: linear-gradient(45deg, #3498db, #2980b9); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px;';
+        editBtn.onclick = function() {
+            alert('Botón Editar funciona! (Equipo ' + (i + 1) + ')');
+        };
+        
+        // Botón Eliminar
+        const deleteBtn = document.createElement('button');
+        deleteBtn.innerHTML = '<i class="fas fa-trash"></i> Eliminar';
+        deleteBtn.style.cssText = 'background: linear-gradient(45deg, #e74c3c, #c0392b); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px;';
+        deleteBtn.onclick = function() {
+            alert('Botón Eliminar funciona! (Equipo ' + (i + 1) + ')');
+        };
+        
+        // Agregar botones al contenedor
+        buttonsDiv.appendChild(editBtn);
+        buttonsDiv.appendChild(deleteBtn);
+        
+        // Agregar contenedor a la tarjeta
+        card.appendChild(buttonsDiv);
+        
+        console.log(`✅ Botones agregados a tarjeta ${i + 1}`);
+    }
+    
+    console.log('✅ COMPLETADO: addEditButtonsToTeams');
+}
+
+// Funciones de equipos
+window.editTeam = editTeam;
+window.deleteTeam = deleteTeam;
+window.cancelTeamEdit = cancelTeamEdit;
+window.addEditButtonsToTeams = addEditButtonsToTeams;
 
 console.log('✅ Funciones globales expuestas correctamente');

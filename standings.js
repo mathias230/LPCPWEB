@@ -141,13 +141,34 @@ async function loadTeamsData() {
         if (response.ok) {
             teamsData = await response.json();
             console.log('✅ Equipos cargados:', teamsData.length);
+            
+            // Recargar tabla de posiciones si estamos en esa pestaña
+            const tableTab = document.querySelector('#table');
+            if (tableTab && tableTab.classList.contains('active')) {
+                console.log('🔄 Recargando tabla de posiciones tras cargar equipos...');
+                loadStandingsTable();
+            }
         } else {
             console.warn('⚠️ No se pudieron cargar los equipos del backend, usando datos por defecto');
             teamsData = generateFallbackTeams();
+            
+            // Recargar tabla de posiciones si estamos en esa pestaña
+            const tableTab = document.querySelector('#table');
+            if (tableTab && tableTab.classList.contains('active')) {
+                console.log('🔄 Recargando tabla de posiciones tras cargar equipos fallback...');
+                loadStandingsTable();
+            }
         }
     } catch (error) {
         console.error('❌ Error cargando equipos:', error);
         teamsData = generateFallbackTeams();
+        
+        // Recargar tabla de posiciones si estamos en esa pestaña
+        const tableTab = document.querySelector('#table');
+        if (tableTab && tableTab.classList.contains('active')) {
+            console.log('🔄 Recargando tabla de posiciones tras error en equipos...');
+            loadStandingsTable();
+        }
     }
 }
 
@@ -420,8 +441,14 @@ async function loadMatchesData() {
 
 // Fallback standings if server is unavailable
 function generateFallbackStandings() {
-    // Si no hay datos de equipos, usar datos de fallback
-    const fallbackTeams = teamsData.length > 0 ? teamsData : generateFallbackTeams();
+    // Si no hay equipos reales, retornar array vacío
+    if (!teamsData || teamsData.length === 0) {
+        console.log('⚠️ No hay equipos reales, retornando standings vacíos');
+        return [];
+    }
+    
+    // Solo usar equipos reales
+    const fallbackTeams = teamsData;
     
     return fallbackTeams.map((team, index) => ({
         position: index + 1,
@@ -533,16 +560,50 @@ function generateSampleFixtures() {
 // Load and display standings table - FIXED VERSION
 function loadStandingsTable() {
     console.log('🔄 Loading standings table...');
+    console.log('🔍 DEBUG: teamsData:', teamsData);
+    console.log('🔍 DEBUG: teamsData.length:', teamsData ? teamsData.length : 'undefined');
+    console.log('🔍 DEBUG: standingsData:', standingsData);
+    console.log('🔍 DEBUG: standingsData.length:', standingsData ? standingsData.length : 'undefined');
+    
     const tableBody = document.getElementById('standingsTableBody');
     if (!tableBody) {
         console.warn('No se encontró el elemento de la tabla de posiciones');
         return;
     }
     
-    // Asegurar que siempre tengamos datos para mostrar
+    // Verificar si hay equipos reales en el sistema
+    if (!teamsData || teamsData.length === 0) {
+        console.log('⚠️ No hay equipos en el sistema, mostrando tabla vacía');
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="10" style="text-align: center; padding: 40px; color: rgba(255,255,255,0.6); font-style: italic;">
+                    <i class="fas fa-trophy" style="font-size: 48px; margin-bottom: 20px; opacity: 0.3; display: block;"></i>
+                    No hay equipos registrados en la liga.
+                    <br><br>
+                    <small>Los equipos aparecerán aquí una vez que se registren en el sistema.</small>
+                </td>
+            </tr>
+        `;
+        // Limpiar la leyenda también
+        const legend = document.querySelector('.table-legend');
+        if (legend) {
+            legend.style.display = 'none';
+        }
+        return;
+    }
+    
+    // Si hay equipos pero no datos de clasificación, generar datos base
     if (!standingsData || standingsData.length === 0) {
-        console.log('No hay datos de clasificación disponibles, generando datos de ejemplo...');
+        console.log('No hay datos de clasificación disponibles, generando datos base para equipos existentes...');
         standingsData = generateFallbackStandings();
+        
+        // Si generateFallbackStandings retorna vacío (no hay equipos reales), salir
+        if (!standingsData || standingsData.length === 0) {
+            console.log('⚠️ No hay equipos reales, manteniendo tabla vacía');
+            return;
+        }
+        
+        console.log(`✅ Generados datos base para ${standingsData.length} equipos`);
     }
     
     // Aplicar estilos dinámicos para las zonas de clasificación
@@ -1713,116 +1774,6 @@ function updateStatsSummary() {
     console.log(`📊 Resumen actualizado: ${totalGoals} goles, ${totalAssists} asistencias, ${avgGoalsPerMatch} promedio`);
 }
 
-// ============ FUNCIONES PARA APARTADO RÁPIDO DE ESTADÍSTICAS ============
-
-// Cargar estadísticas de jugadores para el apartado rápido
-async function loadQuickPlayerStats() {
-    try {
-        console.log('⚡ Cargando estadísticas rápidas de jugadores...');
-        const response = await fetch('/api/players');
-        if (response.ok) {
-            const players = await response.json();
-            console.log(`✅ ${players.length} jugadores cargados para estadísticas rápidas`);
-            
-            // Mostrar top goleadores y asistidores
-            displayQuickTopScorers(players);
-            displayQuickTopAssisters(players);
-            
-            return true;
-        } else {
-            console.warn('⚠️ No se pudieron cargar las estadísticas rápidas');
-            showQuickStatsError();
-            return false;
-        }
-    } catch (error) {
-        console.error('❌ Error cargando estadísticas rápidas:', error);
-        showQuickStatsError();
-        return false;
-    }
-}
-
-// Mostrar top 5 goleadores en el apartado rápido
-function displayQuickTopScorers(players) {
-    const container = document.getElementById('quickTopScorers');
-    if (!container) return;
-    
-    // Filtrar y ordenar jugadores por goles
-    const topScorers = players
-        .filter(player => (parseInt(player.goals) || 0) > 0)
-        .sort((a, b) => (parseInt(b.goals) || 0) - (parseInt(a.goals) || 0))
-        .slice(0, 5);
-    
-    if (topScorers.length === 0) {
-        container.innerHTML = `
-            <div class="loading-stats">
-                <i class="fas fa-info-circle"></i>
-                No hay goleadores registrados
-            </div>`;
-        return;
-    }
-    
-    container.innerHTML = topScorers.map((player, index) => `
-        <div class="quick-stat-item">
-            <div class="quick-stat-player">
-                <div class="quick-stat-rank">${index + 1}</div>
-                <div>
-                    <div class="quick-stat-name">${player.name || 'Jugador'}</div>
-                    <div class="quick-stat-team">${player.clubName || 'Sin equipo'}</div>
-                </div>
-            </div>
-            <div class="quick-stat-value">${player.goals || 0}</div>
-        </div>
-    `).join('');
-}
-
-// Mostrar top 5 asistidores en el apartado rápido
-function displayQuickTopAssisters(players) {
-    const container = document.getElementById('quickTopAssisters');
-    if (!container) return;
-    
-    // Filtrar y ordenar jugadores por asistencias
-    const topAssisters = players
-        .filter(player => (parseInt(player.assists) || 0) > 0)
-        .sort((a, b) => (parseInt(b.assists) || 0) - (parseInt(a.assists) || 0))
-        .slice(0, 5);
-    
-    if (topAssisters.length === 0) {
-        container.innerHTML = `
-            <div class="loading-stats">
-                <i class="fas fa-info-circle"></i>
-                No hay asistidores registrados
-            </div>`;
-        return;
-    }
-    
-    container.innerHTML = topAssisters.map((player, index) => `
-        <div class="quick-stat-item">
-            <div class="quick-stat-player">
-                <div class="quick-stat-rank">${index + 1}</div>
-                <div>
-                    <div class="quick-stat-name">${player.name || 'Jugador'}</div>
-                    <div class="quick-stat-team">${player.clubName || 'Sin equipo'}</div>
-                </div>
-            </div>
-            <div class="quick-stat-value">${player.assists || 0}</div>
-        </div>
-    `).join('');
-}
-
-// Mostrar error en las estadísticas rápidas
-function showQuickStatsError() {
-    const scorersContainer = document.getElementById('quickTopScorers');
-    const assistersContainer = document.getElementById('quickTopAssisters');
-    
-    const errorHTML = `
-        <div class="loading-stats">
-            <i class="fas fa-exclamation-triangle"></i>
-            Error cargando datos
-        </div>`;
-    
-    if (scorersContainer) scorersContainer.innerHTML = errorHTML;
-    if (assistersContainer) assistersContainer.innerHTML = errorHTML;
-}
 
 // ============ FUNCIONES PARA PESTAÑA PRINCIPAL DE ESTADÍSTICAS ============
 
