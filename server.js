@@ -373,12 +373,6 @@ async function restoreFromCloudinary() {
         if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY) {
             console.log('🔑 Credenciales de Cloudinary encontradas');
             
-            // TEMPORAL: Deshabilitar restauración desde Cloudinary para forzar carga local
-            console.log('⚠️ Restauración desde Cloudinary deshabilitada temporalmente');
-            console.log('📁 Procediendo con carga local...');
-            return false;
-            
-            /* CÓDIGO ORIGINAL COMENTADO HASTA CORREGIR FETCH
             const backupUrl = cloudinary.url('lpcp/backups/tournament_data.json', {
                 resource_type: 'raw'
             });
@@ -399,9 +393,14 @@ async function restoreFromCloudinary() {
                 if (data.stats) stats = data.stats;
                 
                 console.log('☁️ Datos restaurados desde Cloudinary exitosamente');
+                console.log('📊 Equipos restaurados:', teams?.length || 0);
+                console.log('🏆 Clubes restaurados:', clubs?.length || 0);
+                console.log('👥 Jugadores restaurados:', players?.length || 0);
+                console.log('🎬 Clips restaurados:', clips?.length || 0);
                 return true;
+            } else {
+                console.log('⚠️ No se encontró backup en Cloudinary o no es accesible');
             }
-            */
         } else {
             console.log('❌ Credenciales de Cloudinary no encontradas');
         }
