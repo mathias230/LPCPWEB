@@ -276,103 +276,278 @@ async function loadTournamentData() {
 // Cargar datos del torneo
 loadTournamentData();
 
-// Función para guardar datos localmente y hacer backup en Cloudinary
+// Función para guardar datos localmente y hacer backup en Cloudinary (OPTIMIZADA)
 function saveData() {
-    return saveDataAsync();
-}
-
-// Función interna async para manejar el guardado
-async function saveDataAsync() {
+    // Guardado síncrono inmediato para garantizar persistencia local
     try {
-        console.log('🔄 INICIANDO GUARDADO DE DATOS...');
-        console.log('📊 Estado actual de arrays:');
-        console.log(`   - players: ${players ? players.length : 'undefined'} elementos`);
-        console.log(`   - clips: ${clips ? clips.length : 'undefined'} elementos`);
-        console.log(`   - teams: ${teams ? teams.length : 'undefined'} elementos`);
-        console.log(`   - clubs: ${clubs ? clubs.length : 'undefined'} elementos`);
+        console.log('🚀 GUARDADO RÁPIDO INICIADO...');
         
-        // Guardar clips y stats
-        console.log('💾 Guardando clips.json...');
+        // Guardar clips y stats inmediatamente
         fs.writeFileSync(clipsFile, JSON.stringify(clips, null, 2));
-        console.log('💾 Guardando stats.json...');
         fs.writeFileSync(statsFile, JSON.stringify(stats, null, 2));
         
-        // Guardar datos del torneo
+        // Guardar datos del torneo inmediatamente
         const tournamentFile = path.join(dataDir, 'tournament.json');
-        console.log('💾 Preparando tournament.json...');
         const tournamentData = {
             teams: teams,
             matches: matches,
             standings: standings,
             settings: settings,
             bracket: currentBracket,
-            clubs: clubs, // Agregar clubes al backup
-            players: players, // Agregar jugadores al backup
-            clips: clips, // Agregar clips al backup
-            stats: stats // Agregar estadísticas al backup
+            clubs: clubs,
+            players: players,
+            clips: clips,
+            stats: stats,
+            lastSaved: new Date().toISOString()
         };
         
-        console.log('📝 Datos a guardar en tournament.json:');
-        console.log(`   - teams: ${tournamentData.teams ? tournamentData.teams.length : 'undefined'}`);
-        console.log(`   - players: ${tournamentData.players ? tournamentData.players.length : 'undefined'}`);
-        console.log(`   - clips: ${tournamentData.clips ? tournamentData.clips.length : 'undefined'}`);
-        console.log(`   - clubs: ${tournamentData.clubs ? tournamentData.clubs.length : 'undefined'}`);
-        
-        console.log('💾 Escribiendo tournament.json...');
         fs.writeFileSync(tournamentFile, JSON.stringify(tournamentData, null, 2));
-        console.log('✅ tournament.json escrito exitosamente');
+        console.log('✅ GUARDADO LOCAL COMPLETADO INMEDIATAMENTE');
         
-        // Verificar que el archivo se escribió correctamente
-        console.log('🔍 Verificando archivo guardado...');
-        const savedData = JSON.parse(fs.readFileSync(tournamentFile, 'utf8'));
-        console.log('📋 Verificación del archivo guardado:');
-        console.log(`   - players en archivo: ${savedData.players ? savedData.players.length : 'undefined'}`);
-        console.log(`   - clips en archivo: ${savedData.clips ? savedData.clips.length : 'undefined'}`);
+        // Backup a Cloudinary en paralelo (no bloquea)
+        setImmediate(() => {
+            backupToCloudinaryAsync(tournamentData).catch(error => {
+                console.warn('⚠️ Backup async falló:', error.message);
+            });
+        });
         
-        // Backup síncrono en Cloudinary para garantizar persistencia
-        console.log('☁️ Iniciando backup en Cloudinary...');
-        try {
-            await backupToCloudinary(tournamentData);
-            console.log('✅ Backup en Cloudinary completado exitosamente');
-        } catch (error) {
-            console.warn('⚠️ Error en backup de Cloudinary:', error.message);
-        }
-        
-        console.log('✅ GUARDADO COMPLETADO EXITOSAMENTE');
+        return true;
     } catch (error) {
-        console.error('❌ ERROR CRÍTICO GUARDANDO DATOS:', error);
-        console.error('❌ Stack trace:', error.stack);
+        console.error('❌ ERROR CRÍTICO EN GUARDADO:', error);
+        return false;
     }
 }
 
-// Función para hacer backup en Cloudinary
-async function backupToCloudinary(data) {
+// Función async para backup completo (LEGACY - mantenida por compatibilidad)
+async function saveDataAsync() {
     try {
-        if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY) {
-            const jsonString = JSON.stringify(data, null, 2);
-            const buffer = Buffer.from(jsonString, 'utf8');
-            
-            const result = await new Promise((resolve, reject) => {
-                cloudinary.uploader.upload_stream(
-                    { 
-                        resource_type: 'raw',
-                        folder: 'lpcp/backups',
-                        public_id: 'tournament_data',
-                        format: 'json'
-                    },
-                    (error, result) => {
-                        if (error) reject(error);
-                        else resolve(result);
-                    }
-                ).end(buffer);
-            });
-            
-            console.log('☁️ Backup en Cloudinary exitoso:', result.public_id);
-        }
+        console.log('🔄 BACKUP COMPLETO INICIADO...');
+        
+        const tournamentFile = path.join(dataDir, 'tournament.json');
+        const tournamentData = {
+            teams: teams,
+            matches: matches,
+            standings: standings,
+            settings: settings,
+            bracket: currentBracket,
+            clubs: clubs,
+            players: players,
+            clips: clips,
+            stats: stats,
+            lastSaved: new Date().toISOString()
+        };
+        
+        // Guardado local
+        fs.writeFileSync(clipsFile, JSON.stringify(clips, null, 2));
+        fs.writeFileSync(statsFile, JSON.stringify(stats, null, 2));
+        fs.writeFileSync(tournamentFile, JSON.stringify(tournamentData, null, 2));
+        
+        // Backup a Cloudinary con timeout
+        await backupToCloudinaryAsync(tournamentData);
+        
+        console.log('✅ BACKUP COMPLETO EXITOSO');
     } catch (error) {
-        console.warn('⚠️ Error en backup de Cloudinary (continuando normalmente):', error.message);
+        console.error('❌ ERROR EN BACKUP COMPLETO:', error);
     }
 }
+
+// Función OPTIMIZADA para backup en Cloudinary con timeout y compresión
+async function backupToCloudinaryAsync(data) {
+    return new Promise((resolve, reject) => {
+        // Timeout de 10 segundos para evitar bloqueos
+        const timeout = setTimeout(() => {
+            console.warn('⏰ Backup a Cloudinary cancelado por timeout (10s)');
+            resolve(false);
+        }, 10000);
+        
+        (async () => {
+            try {
+                if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY) {
+                    console.log('⚠️ Cloudinary no configurado, saltando backup');
+                    clearTimeout(timeout);
+                    resolve(false);
+                    return;
+                }
+                
+                console.log('☁️ Iniciando backup optimizado a Cloudinary...');
+                
+                // Comprimir datos para upload más rápido
+                const compressedData = {
+                    teams: data.teams || [],
+                    matches: data.matches || [],
+                    standings: data.standings || [],
+                    settings: data.settings || {},
+                    bracket: data.bracket,
+                    clubs: data.clubs || [],
+                    players: data.players || [],
+                    clips: (data.clips || []).map(clip => ({
+                        id: clip.id,
+                        title: clip.title,
+                        type: clip.type,
+                        club: clip.club,
+                        likes: clip.likes,
+                        views: clip.views,
+                        url: clip.url,
+                        created_at: clip.created_at
+                    })),
+                    stats: data.stats || {},
+                    lastSaved: new Date().toISOString(),
+                    version: '2.0'
+                };
+                
+                const jsonString = JSON.stringify(compressedData);
+                const buffer = Buffer.from(jsonString, 'utf8');
+                
+                console.log(`📦 Tamaño del backup: ${(buffer.length / 1024).toFixed(2)} KB`);
+                
+                const result = await new Promise((uploadResolve, uploadReject) => {
+                    cloudinary.uploader.upload_stream(
+                        { 
+                            resource_type: 'raw',
+                            folder: 'lpcp/backups',
+                            public_id: `tournament_data_${Date.now()}`,
+                            format: 'json',
+                            timeout: 8000 // 8 segundos de timeout interno
+                        },
+                        (error, result) => {
+                            if (error) uploadReject(error);
+                            else uploadResolve(result);
+                        }
+                    ).end(buffer);
+                });
+                
+                clearTimeout(timeout);
+                console.log(`✅ Backup rápido completado: ${result.public_id}`);
+                resolve(true);
+                
+            } catch (error) {
+                clearTimeout(timeout);
+                console.warn(`⚠️ Error en backup optimizado: ${error.message}`);
+                resolve(false);
+            }
+        })();
+    });
+}
+
+// Función legacy mantenida por compatibilidad
+async function backupToCloudinary(data) {
+    return backupToCloudinaryAsync(data);
+}
+
+// AUTO-BACKUP: Función que se ejecuta automáticamente cuando hay cambios críticos
+function autoBackup(changeType = 'unknown') {
+    console.log(`🔄 AUTO-BACKUP activado por: ${changeType}`);
+    
+    // Ejecutar backup inmediato sin bloquear
+    setImmediate(() => {
+        const success = saveData();
+        if (success) {
+            console.log(`✅ Auto-backup completado para: ${changeType}`);
+        } else {
+            console.warn(`⚠️ Auto-backup falló para: ${changeType}`);
+        }
+    });
+}
+
+// Función para forzar backup completo (para casos críticos)
+async function forceBackup(reason = 'manual') {
+    console.log(`🚨 BACKUP FORZADO iniciado por: ${reason}`);
+    try {
+        const success = saveData();
+        if (success) {
+            // También intentar backup completo async
+            await saveDataAsync();
+            console.log(`✅ Backup forzado completado: ${reason}`);
+            return true;
+        }
+    } catch (error) {
+        console.error(`❌ Error en backup forzado: ${error.message}`);
+    }
+    return false;
+}
+
+// VERIFICACIÓN DE INTEGRIDAD: Verificar que los datos estén consistentes
+function verifyDataIntegrity() {
+    try {
+        console.log('🔍 Verificando integridad de datos...');
+        
+        const issues = [];
+        
+        // Verificar que arrays críticos existan
+        if (!Array.isArray(teams)) {
+            issues.push('teams no es un array');
+            teams = [];
+        }
+        
+        if (!Array.isArray(players)) {
+            issues.push('players no es un array');
+            players = [];
+        }
+        
+        if (!Array.isArray(clips)) {
+            issues.push('clips no es un array');
+            clips = [];
+        }
+        
+        if (!Array.isArray(clubs)) {
+            issues.push('clubs no es un array');
+            clubs = [];
+        }
+        
+        // Verificar tournament.teams
+        if (!tournament.teams || !Array.isArray(tournament.teams)) {
+            issues.push('tournament.teams no es un array');
+            tournament.teams = [];
+        }
+        
+        // Sincronizar teams con tournament.teams si hay discrepancias
+        if (teams.length !== tournament.teams.length) {
+            issues.push(`Discrepancia: teams(${teams.length}) vs tournament.teams(${tournament.teams.length})`);
+            initializeTournamentTeams();
+        }
+        
+        if (issues.length > 0) {
+            console.warn('⚠️ Problemas de integridad detectados:', issues);
+            // Auto-backup después de correcciones
+            autoBackup('integrity_fix');
+        } else {
+            console.log('✅ Integridad de datos verificada correctamente');
+        }
+        
+        return issues.length === 0;
+    } catch (error) {
+        console.error('❌ Error verificando integridad:', error);
+        return false;
+    }
+}
+
+// BACKUP AUTOMÁTICO PERIÓDICO: Cada 5 minutos
+setInterval(() => {
+    console.log('⏰ Backup automático periódico iniciado...');
+    verifyDataIntegrity();
+    autoBackup('periodic_5min');
+}, 5 * 60 * 1000); // 5 minutos
+
+// BACKUP AUTOMÁTICO FRECUENTE: Cada 30 segundos (solo local, sin Cloudinary)
+setInterval(() => {
+    try {
+        const tournamentFile = path.join(dataDir, 'tournament.json');
+        const quickData = {
+            teams: teams,
+            tournament: tournament,
+            players: players,
+            clubs: clubs,
+            clips: clips,
+            stats: stats,
+            lastQuickSave: new Date().toISOString()
+        };
+        
+        fs.writeFileSync(tournamentFile, JSON.stringify(quickData, null, 2));
+        console.log('💾 Quick-save local completado');
+    } catch (error) {
+        console.warn('⚠️ Error en quick-save:', error.message);
+    }
+}, 30 * 1000); // 30 segundos
 
 // Función para restaurar datos desde Cloudinary
 async function restoreFromCloudinary() {
@@ -941,7 +1116,8 @@ app.put('/api/tournament/matches/:id', (req, res) => {
         // Actualizar tabla de posiciones automáticamente
         updateStandingsFromMatches();
         
-        saveData();
+        // AUTO-BACKUP inmediato para cambios críticos
+        autoBackup('match_updated');
         
         // Emitir actualizaciones en tiempo real
         io.emit('matchesUpdate', matches);
@@ -969,7 +1145,8 @@ app.delete('/api/tournament/matches/:id', (req, res) => {
         // Recalcular tabla de posiciones
         updateStandingsFromMatches();
         
-        saveData();
+        // AUTO-BACKUP inmediato para cambios críticos
+        autoBackup('match_deleted');
         
         // Emitir actualizaciones en tiempo real
         io.emit('matchesUpdate', matches);
@@ -2433,11 +2610,56 @@ server.listen(PORT, () => {
     console.log(`💾 Datos guardados en: ${dataDir}`);
 });
 
-// Manejo de errores
-process.on('uncaughtException', (error) => {
-    console.error('Error no capturado:', error);
+// BACKUP DE EMERGENCIA: Ejecutar antes de cerrar el servidor
+process.on('SIGTERM', async () => {
+    console.log('🚨 SIGTERM recibido - Ejecutando backup de emergencia...');
+    try {
+        await forceBackup('SIGTERM_shutdown');
+        console.log('✅ Backup de emergencia completado');
+    } catch (error) {
+        console.error('❌ Error en backup de emergencia:', error);
+    }
+    process.exit(0);
 });
 
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('Promesa rechazada no manejada:', reason);
+process.on('SIGINT', async () => {
+    console.log('🚨 SIGINT recibido - Ejecutando backup de emergencia...');
+    try {
+        await forceBackup('SIGINT_shutdown');
+        console.log('✅ Backup de emergencia completado');
+    } catch (error) {
+        console.error('❌ Error en backup de emergencia:', error);
+    }
+    process.exit(0);
+});
+
+// Backup de emergencia antes de que Render reinicie el servidor
+process.on('beforeExit', async () => {
+    console.log('🚨 Proceso a punto de terminar - Backup final...');
+    try {
+        await forceBackup('before_exit');
+    } catch (error) {
+        console.error('❌ Error en backup final:', error);
+    }
+});
+
+// Manejo de errores
+process.on('uncaughtException', async (error) => {
+    console.error('❌ Error no capturado:', error);
+    // Backup de emergencia antes de crash
+    try {
+        await forceBackup('uncaught_exception');
+    } catch (backupError) {
+        console.error('❌ Error en backup de emergencia:', backupError);
+    }
+});
+
+process.on('unhandledRejection', async (reason, promise) => {
+    console.error('❌ Promesa rechazada no manejada:', reason);
+    // Backup de emergencia
+    try {
+        await forceBackup('unhandled_rejection');
+    } catch (backupError) {
+        console.error('❌ Error en backup de emergencia:', backupError);
+    }
 });
