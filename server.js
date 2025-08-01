@@ -7,6 +7,7 @@ const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
 const cloudinary = require('cloudinary').v2;
+const mongoose = require('mongoose');
 
 const app = express();
 const server = http.createServer(app);
@@ -19,7 +20,23 @@ const io = socketIo(server, {
 
 const PORT = process.env.PORT || 3000;
 
-// Configuración de Cloudinary
+// Configuración de MongoDB
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/lpcp';
+
+// Conectar a MongoDB
+mongoose.connect(MONGODB_URI)
+    .then(() => {
+        console.log('✅ Conectado a MongoDB exitosamente');
+        useDatabase = true;
+        console.log('💾 Usando MongoDB para persistencia de datos');
+    })
+    .catch((error) => {
+        console.error('❌ Error conectando a MongoDB:', error);
+        console.log('⚠️ Continuando con archivos locales como fallback');
+        useDatabase = false;
+    });
+
+// Configuración de Cloudinary (SOLO PARA CLIPS)
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
@@ -92,9 +109,75 @@ let stats = {
     total_likes: 0
 };
 
-// VARIABLES CRÍTICAS - DEBEN ESTAR ANTES DE loadTournamentData()
-let players = []; // Jugadores de la liga
-let clubs = [];   // Clubes de la liga
+// ==================== MODELOS DE MONGODB ====================
+
+// Modelo para Equipos
+const TeamSchema = new mongoose.Schema({
+    name: { type: String, required: true, unique: true },
+    logo: { type: String, default: 'img/default-team.png' },
+    founded: { type: Number },
+    stadium: { type: String },
+    createdAt: { type: Date, default: Date.now }
+});
+
+// Modelo para Jugadores
+const PlayerSchema = new mongoose.Schema({
+    name: { type: String, required: true },
+    clubId: { type: String, required: true },
+    clubName: { type: String, required: true },
+    position: { type: String, default: 'Jugador' },
+    age: { type: Number },
+    number: { type: Number },
+    nationality: { type: String, default: 'Panamá' },
+    photo: { type: String, default: '' },
+    goals: { type: Number, default: 0 },
+    assists: { type: Number, default: 0 },
+    registeredAt: { type: Date, default: Date.now }
+});
+
+// Modelo para Clubes
+const ClubSchema = new mongoose.Schema({
+    name: { type: String, required: true, unique: true },
+    description: { type: String, required: true },
+    founded: { type: Number, required: true },
+    players: { type: Number, required: true },
+    logo: { type: String, default: '' },
+    createdAt: { type: Date, default: Date.now }
+});
+
+// Modelo para Partidos
+const MatchSchema = new mongoose.Schema({
+    homeTeam: { type: String, required: true },
+    awayTeam: { type: String, required: true },
+    homeScore: { type: Number, default: null },
+    awayScore: { type: Number, default: null },
+    matchday: { type: Number, required: true },
+    status: { type: String, enum: ['scheduled', 'finished'], default: 'scheduled' },
+    date: { type: Date },
+    createdAt: { type: Date, default: Date.now }
+});
+
+// Modelo para Configuración del Torneo
+const TournamentSettingsSchema = new mongoose.Schema({
+    seasonName: { type: String, default: 'Temporada 2025' },
+    pointsWin: { type: Number, default: 3 },
+    pointsDraw: { type: Number, default: 1 },
+    pointsLoss: { type: Number, default: 0 },
+    currentBracket: { type: mongoose.Schema.Types.Mixed },
+    updatedAt: { type: Date, default: Date.now }
+});
+
+// Crear modelos
+const Team = mongoose.model('Team', TeamSchema);
+const Player = mongoose.model('Player', PlayerSchema);
+const Club = mongoose.model('Club', ClubSchema);
+const Match = mongoose.model('Match', MatchSchema);
+const TournamentSettings = mongoose.model('TournamentSettings', TournamentSettingsSchema);
+
+// VARIABLES CRÍTICAS - AHORA CON FALLBACK A MONGODB
+let players = []; // Fallback local
+let clubs = [];   // Fallback local
+let useDatabase = false; // Flag para saber si usar MongoDB
 
 // Tabla de posiciones dinámica (se genera automáticamente basada en equipos y partidos)
 let standings = [];
@@ -166,115 +249,201 @@ if (fs.existsSync(statsFile)) {
     }
 }
 
-// Función para cargar datos (primero desde Cloudinary, luego local)
+// Función híbrida para cargar datos (MongoDB primero, luego archivos locales como fallback)
 async function loadTournamentData() {
-    console.log('🔄 Iniciando carga de datos del torneo...');
+    console.log('🔄 Iniciando carga híbrida de datos del torneo...');
     
-    // Intentar restaurar desde Cloudinary primero
-    const restoredFromCloud = await restoreFromCloudinary();
-    console.log('☁️ Resultado de restauración desde Cloudinary:', restoredFromCloud);
-    
-    if (!restoredFromCloud) {
-        // Si no se pudo restaurar desde Cloudinary, cargar datos locales
-        const tournamentFile = path.join(dataDir, 'tournament.json');
-        if (fs.existsSync(tournamentFile)) {
-            try {
-                const tournamentData = fs.readFileSync(tournamentFile, 'utf8');
-                const data = JSON.parse(tournamentData);
-                
-                if (data.teams && data.teams.length > 0) {
-                    teams = data.teams;
-                    // Actualizar los equipos en el objeto tournament
-                    tournament.teams = [...teams];
-                    console.log('✅ Equipos cargados (local):', teams.length);
-                }
-                
-                if (data.matches && data.matches.length > 0) {
-                    matches = data.matches;
-                    console.log('✅ Partidos cargados (local):', matches.length);
-                }
-                
-                if (data.standings && data.standings.length > 0) {
-                    standings = data.standings;
-                    console.log('✅ Tabla de posiciones cargada (local):', standings.length);
-                }
-                
-                if (data.settings) {
-                    settings = { ...settings, ...data.settings };
-                    console.log('✅ Configuración cargada (local)');
-                }
-                
-                if (data.currentBracket) {
-                    currentBracket = data.currentBracket;
-                    console.log('✅ Bracket cargado (local)');
-                }
-                
-                if (data.clubs && data.clubs.length > 0) {
-                    clubs = data.clubs;
-                    console.log('✅ Clubes cargados (local):', clubs.length);
-                }
-                
-                // CRÍTICO: Cargar jugadores con logs detallados
-                console.log('🔍 Verificando jugadores en datos:', {
-                    hasPlayers: !!data.players,
-                    playersType: typeof data.players,
-                    playersLength: data.players ? data.players.length : 'N/A'
-                });
-                
-                if (data.players) {
-                    if (data.players.length > 0) {
-                        players = data.players;
-                        console.log('✅ Jugadores cargados (local):', players.length);
-                        console.log('👥 Primeros 3 jugadores:', players.slice(0, 3).map(p => ({ id: p.id, name: p.name, clubName: p.clubName })));
-                    } else {
-                        console.log('⚠️ Array de jugadores está vacío');
-                    }
-                } else {
-                    console.log('❌ No se encontró sección "players" en los datos');
-                }
-                
-                // CRÍTICO: Cargar clips con logs detallados
-                console.log('🔍 Verificando clips en datos:', {
-                    hasClips: !!data.clips,
-                    clipsType: typeof data.clips,
-                    clipsLength: data.clips ? data.clips.length : 'N/A'
-                });
-                
-                if (data.clips) {
-                    if (data.clips.length > 0) {
-                        clips = data.clips;
-                        console.log('✅ Clips cargados (local):', clips.length);
-                        console.log('🎬 Primeros 3 clips:', clips.slice(0, 3).map(c => ({ id: c.id, title: c.title })));
-                    } else {
-                        console.log('⚠️ Array de clips está vacío');
-                    }
-                } else {
-                    console.log('❌ No se encontró sección "clips" en los datos');
-                }
-                
-                if (data.stats) {
-                    stats = { ...stats, ...data.stats };
-                    console.log('✅ Estadísticas cargadas (local)');
-                }
-                
-                // RESUMEN FINAL DE CARGA
-                console.log('🎯 RESUMEN FINAL DE CARGA:');
-                console.log('   - Equipos:', teams.length);
-                console.log('   - Partidos:', matches.length);
-                console.log('   - Jugadores:', players.length);
-                console.log('   - Clips:', clips.length);
-                console.log('   - Clubes:', clubs.length);
-                
-            } catch (error) {
-                console.error('❌ Error cargando datos del torneo:', error);
-                console.log('🔄 Usando datos por defecto');
-            }
-        } else {
-            console.log('📝 Archivo de torneo no encontrado, usando datos por defecto');
+    // PASO 1: Intentar cargar desde MongoDB si está disponible
+    if (useDatabase) {
+        console.log('💾 Cargando datos desde MongoDB...');
+        try {
+            await loadFromMongoDB();
+            console.log('✅ Datos cargados exitosamente desde MongoDB');
+            return;
+        } catch (error) {
+            console.error('❌ Error cargando desde MongoDB:', error);
+            console.log('⚠️ Continuando con carga desde archivos locales...');
         }
     }
     
-    console.log('✅ Función loadTournamentData completada');
+    // PASO 2: Cargar desde archivos locales como fallback
+    console.log('📁 Cargando datos desde archivos locales...');
+    await loadFromLocalFiles();
+    
+    console.log('✅ Carga de datos completada');
+}
+
+// Función para cargar datos desde MongoDB
+async function loadFromMongoDB() {
+    console.log('🔍 Consultando MongoDB para cargar datos...');
+    
+    try {
+        // Cargar equipos desde MongoDB
+        const mongoTeams = await Team.find({}).sort({ createdAt: 1 });
+        if (mongoTeams.length > 0) {
+            teams = mongoTeams.map(team => ({
+                id: team._id.toString(),
+                name: team.name,
+                logo: team.logo,
+                founded: team.founded,
+                stadium: team.stadium
+            }));
+            // Sincronizar con tournament.teams
+            tournament.teams = teams.map(team => ({
+                id: team.id,
+                name: team.name,
+                shortName: team.name.substring(0, 3).toUpperCase(),
+                logo: team.logo || 'img/default-team.png',
+                stadium: team.stadium || '',
+                played: 0, won: 0, drawn: 0, lost: 0,
+                goalsFor: 0, goalsAgainst: 0, goalDifference: 0, points: 0
+            }));
+            console.log('✅ Equipos cargados desde MongoDB:', teams.length);
+        }
+        
+        // Cargar jugadores desde MongoDB
+        const mongoPlayers = await Player.find({}).sort({ registeredAt: 1 });
+        if (mongoPlayers.length > 0) {
+            players = mongoPlayers.map(player => ({
+                id: player._id.toString(),
+                name: player.name,
+                clubId: player.clubId,
+                clubName: player.clubName,
+                position: player.position,
+                age: player.age,
+                number: player.number,
+                nationality: player.nationality,
+                photo: player.photo,
+                goals: player.goals || 0,
+                assists: player.assists || 0
+            }));
+            console.log('✅ Jugadores cargados desde MongoDB:', players.length);
+        }
+        
+        // Cargar clubes desde MongoDB
+        const mongoClubs = await Club.find({}).sort({ createdAt: 1 });
+        if (mongoClubs.length > 0) {
+            clubs = mongoClubs.map(club => ({
+                id: club._id.toString(),
+                name: club.name,
+                founded: club.founded,
+                players: club.players,
+                logo: club.logo
+            }));
+            console.log('✅ Clubes cargados desde MongoDB:', clubs.length);
+        }
+        
+        // Cargar partidos desde MongoDB
+        const mongoMatches = await Match.find({}).sort({ date: 1 });
+        if (mongoMatches.length > 0) {
+            matches = mongoMatches.map(match => ({
+                id: match._id.toString(),
+                homeTeam: match.homeTeam,
+                awayTeam: match.awayTeam,
+                homeScore: match.homeScore,
+                awayScore: match.awayScore,
+                date: match.date,
+                status: match.status,
+                round: match.round
+            }));
+            console.log('✅ Partidos cargados desde MongoDB:', matches.length);
+        }
+        
+        // Cargar configuración del torneo desde MongoDB
+        const mongoSettings = await TournamentSettings.findOne({});
+        if (mongoSettings) {
+            settings = {
+                seasonName: mongoSettings.seasonName,
+                pointsWin: mongoSettings.pointsWin,
+                pointsDraw: mongoSettings.pointsDraw,
+                pointsLoss: mongoSettings.pointsLoss
+            };
+            console.log('✅ Configuración cargada desde MongoDB');
+        }
+        
+        console.log('🎯 RESUMEN CARGA MONGODB:');
+        console.log('   - Equipos:', teams.length);
+        console.log('   - Jugadores:', players.length);
+        console.log('   - Clubes:', clubs.length);
+        console.log('   - Partidos:', matches.length);
+        
+    } catch (error) {
+        console.error('❌ Error en carga desde MongoDB:', error);
+        throw error;
+    }
+}
+
+// Función para cargar datos desde archivos locales (fallback)
+async function loadFromLocalFiles() {
+    const tournamentFile = path.join(dataDir, 'tournament.json');
+    
+    if (fs.existsSync(tournamentFile)) {
+        try {
+            const tournamentData = fs.readFileSync(tournamentFile, 'utf8');
+            const data = JSON.parse(tournamentData);
+            
+            if (data.teams && data.teams.length > 0) {
+                teams = data.teams;
+                tournament.teams = [...teams];
+                console.log('✅ Equipos cargados (local):', teams.length);
+            }
+            
+            if (data.matches && data.matches.length > 0) {
+                matches = data.matches;
+                console.log('✅ Partidos cargados (local):', matches.length);
+            }
+            
+            if (data.standings && data.standings.length > 0) {
+                standings = data.standings;
+                console.log('✅ Tabla de posiciones cargada (local):', standings.length);
+            }
+            
+            if (data.settings) {
+                settings = { ...settings, ...data.settings };
+                console.log('✅ Configuración cargada (local)');
+            }
+            
+            if (data.currentBracket) {
+                currentBracket = data.currentBracket;
+                console.log('✅ Bracket cargado (local)');
+            }
+            
+            if (data.clubs && data.clubs.length > 0) {
+                clubs = data.clubs;
+                console.log('✅ Clubes cargados (local):', clubs.length);
+            }
+            
+            // Cargar jugadores con logs detallados
+            if (data.players && data.players.length > 0) {
+                players = data.players;
+                console.log('✅ Jugadores cargados (local):', players.length);
+            }
+            
+            // Cargar clips con logs detallados
+            if (data.clips && data.clips.length > 0) {
+                clips = data.clips;
+                console.log('✅ Clips cargados (local):', clips.length);
+            }
+            
+            if (data.stats) {
+                stats = { ...stats, ...data.stats };
+                console.log('✅ Estadísticas cargadas (local)');
+            }
+            
+            console.log('🎯 RESUMEN CARGA LOCAL:');
+            console.log('   - Equipos:', teams.length);
+            console.log('   - Partidos:', matches.length);
+            console.log('   - Jugadores:', players.length);
+            console.log('   - Clips:', clips.length);
+            console.log('   - Clubes:', clubs.length);
+            
+        } catch (error) {
+            console.error('❌ Error cargando datos locales:', error);
+            console.log('🔄 Usando datos por defecto');
+        }
+    } else {
+        console.log('📝 Archivo tournament.json no encontrado, usando datos por defecto');
+    }
 }
 
 // Cargar datos del torneo
@@ -286,17 +455,30 @@ setTimeout(() => {
     diagnosticReport();
 }, 3000); // 3 segundos después del inicio
 
-// Función para guardar datos localmente y hacer backup en Cloudinary (OPTIMIZADA)
-function saveData() {
-    // Guardado síncrono inmediato para garantizar persistencia local
+// ==================== FUNCIONES HÍBRIDAS MONGODB + ARCHIVOS ====================
+
+// Función para guardar datos (MongoDB + fallback local)
+async function saveData() {
     try {
-        console.log('🚀 GUARDADO RÁPIDO INICIADO...');
+        console.log('🚀 GUARDADO HÍBRIDO INICIADO...');
         
-        // Guardar clips y stats inmediatamente
+        // PASO 1: Guardar en MongoDB si está disponible
+        if (useDatabase) {
+            console.log('💾 Guardando en MongoDB...');
+            try {
+                await saveToMongoDB();
+                console.log('✅ Datos guardados exitosamente en MongoDB');
+            } catch (dbError) {
+                console.warn('⚠️ Error guardando en MongoDB:', dbError.message);
+                console.log('📁 Continuando con guardado local...');
+            }
+        }
+        
+        // PASO 2: SIEMPRE guardar localmente como backup
+        console.log('📁 Guardando archivos locales...');
         fs.writeFileSync(clipsFile, JSON.stringify(clips, null, 2));
         fs.writeFileSync(statsFile, JSON.stringify(stats, null, 2));
         
-        // Guardar datos del torneo inmediatamente
         const tournamentFile = path.join(dataDir, 'tournament.json');
         const tournamentData = {
             teams: teams,
@@ -308,23 +490,125 @@ function saveData() {
             players: players,
             clips: clips,
             stats: stats,
-            lastSaved: new Date().toISOString()
+            lastSaved: new Date().toISOString(),
+            usingDatabase: useDatabase
         };
         
         fs.writeFileSync(tournamentFile, JSON.stringify(tournamentData, null, 2));
-        console.log('✅ GUARDADO LOCAL COMPLETADO INMEDIATAMENTE');
+        console.log('✅ GUARDADO LOCAL COMPLETADO');
         
-        // Backup a Cloudinary en paralelo (no bloquea)
-        setImmediate(() => {
-            backupToCloudinaryAsync(tournamentData).catch(error => {
-                console.warn('⚠️ Backup async falló:', error.message);
-            });
-        });
+        // Cloudinary reservado solo para clips/videos
+        console.log('📝 Cloudinary reservado solo para clips/videos');
         
         return true;
     } catch (error) {
         console.error('❌ ERROR CRÍTICO EN GUARDADO:', error);
         return false;
+    }
+}
+
+// Función para guardar datos en MongoDB
+async function saveToMongoDB() {
+    console.log('🔄 Sincronizando datos con MongoDB...');
+    
+    try {
+        // Guardar equipos en MongoDB
+        if (teams && teams.length > 0) {
+            for (const team of teams) {
+                await Team.findOneAndUpdate(
+                    { name: team.name },
+                    {
+                        name: team.name,
+                        logo: team.logo || 'img/default-team.png',
+                        founded: team.founded,
+                        stadium: team.stadium
+                    },
+                    { upsert: true, new: true }
+                );
+            }
+            console.log('✅ Equipos sincronizados con MongoDB:', teams.length);
+        }
+        
+        // Guardar jugadores en MongoDB
+        if (players && players.length > 0) {
+            for (const player of players) {
+                await Player.findOneAndUpdate(
+                    { name: player.name, clubName: player.clubName },
+                    {
+                        name: player.name,
+                        clubId: player.clubId,
+                        clubName: player.clubName,
+                        position: player.position || 'Jugador',
+                        age: player.age,
+                        number: player.number,
+                        nationality: player.nationality || 'Panamá',
+                        photo: player.photo || '',
+                        goals: player.goals || 0,
+                        assists: player.assists || 0
+                    },
+                    { upsert: true, new: true }
+                );
+            }
+            console.log('✅ Jugadores sincronizados con MongoDB:', players.length);
+        }
+        
+        // Guardar clubes en MongoDB
+        if (clubs && clubs.length > 0) {
+            for (const club of clubs) {
+                await Club.findOneAndUpdate(
+                    { name: club.name },
+                    {
+                        name: club.name,
+                        founded: club.founded,
+                        players: club.players,
+                        logo: club.logo || 'img/default-team.png'
+                    },
+                    { upsert: true, new: true }
+                );
+            }
+            console.log('✅ Clubes sincronizados con MongoDB:', clubs.length);
+        }
+        
+        // Guardar partidos en MongoDB
+        if (matches && matches.length > 0) {
+            for (const match of matches) {
+                await Match.findOneAndUpdate(
+                    { homeTeam: match.homeTeam, awayTeam: match.awayTeam, date: match.date },
+                    {
+                        homeTeam: match.homeTeam,
+                        awayTeam: match.awayTeam,
+                        homeScore: match.homeScore,
+                        awayScore: match.awayScore,
+                        date: match.date,
+                        status: match.status || 'scheduled',
+                        round: match.round
+                    },
+                    { upsert: true, new: true }
+                );
+            }
+            console.log('✅ Partidos sincronizados con MongoDB:', matches.length);
+        }
+        
+        // Guardar configuración del torneo en MongoDB
+        if (settings) {
+            await TournamentSettings.findOneAndUpdate(
+                {},
+                {
+                    seasonName: settings.seasonName || 'Temporada 2025',
+                    pointsWin: settings.pointsWin || 3,
+                    pointsDraw: settings.pointsDraw || 1,
+                    pointsLoss: settings.pointsLoss || 0
+                },
+                { upsert: true, new: true }
+            );
+            console.log('✅ Configuración sincronizada con MongoDB');
+        }
+        
+        console.log('🎯 SINCRONIZACIÓN MONGODB COMPLETADA');
+        
+    } catch (error) {
+        console.error('❌ Error en sincronización MongoDB:', error);
+        throw error;
     }
 }
 

@@ -1,28 +1,327 @@
 {
-  "teams": [],
-  "matches": [],
-  "standings": [],
-  "settings": {
-    "seasonName": "Temporada 2025",
-    "pointsWin": 3,
-    "pointsDraw": 1,
-    "pointsLoss": 0,
-    "classificationZones": [
+  "teams": [
+    {
+      "id": 1,
+      "name": "ACP 507",
+      "founded": 2020,
+      "stadium": "Estadio ACP",
+      "logo": "img/default-team.png"
+    },
+    {
+      "id": 2,
+      "name": "BKS FC",
+      "founded": 2023,
+      "stadium": "BKS Stadium",
+      "logo": "img/default-team.png"
+    },
+    {
+      "id": 3,
+      "name": "Coiner FC",
+      "founded": 2019,
+      "stadium": "Campo Coiner",
+      "logo": "img/default-team.png"
+    },
+    {
+      "id": 4,
+      "name": "FC WEST SIDE",
+      "founded": 2021,
+      "stadium": "West Side Arena",
+      "logo": "img/default-team.png"
+    },
+    {
+      "id": 5,
+      "name": "Humacao FC",
+      "founded": 2020,
+      "stadium": "Estadio Humacao",
+      "logo": "img/default-team.png"
+    },
+    {
+      "id": 6,
+      "name": "Jumpers FC",
+      "founded": 2022,
+      "stadium": "Jumpers Arena",
+      "logo": "img/default-team.png"
+    },
+    {
+      "id": 7,
+      "name": "LOS PLEBES Tk",
+      "founded": 2021,
+      "stadium": "Estadio Los Plebes",
+      "logo": "img/default-team.png"
+    },
+    {
+      "id": 8,
+      "name": "Punta Coco FC",
+      "founded": 2018,
+      "stadium": "Punta Coco Field",
+      "logo": "img/default-team.png"
+    },
+    {
+      "id": 9,
+      "name": "Pura Vibra",
+      "founded": 2022,
+      "stadium": "Vibra Stadium",
+      "logo": "img/default-team.png"
+    },
+    {
+      "id": 10,
+      "name": "Rayos X FC",
+      "founded": 2020,
+      "stadium": "Rayos Stadium",
+      "logo": "img/default-team.png"
+    },
+    {
+      "id": 11,
+      "name": "Tiki Taka FC",
+      "founded": 2021,
+      "stadium": "Tiki Taka Field",
+      "logo": "img/default-team.png"
+    },
+    {
+      "id": 12,
+      "name": "WEST SIDE PTY",
+      "founded": 2023,
+      "stadium": "West Side Stadium",
+      "logo": "img/default-team.png"
+    }
+  ],
+  "tournament": {
+    "teams": [
       {
         "id": 1,
-        "name": "Clasificación Directa",
-        "positions": "1-8",
-        "color": "#00ff88"
+        "name": "ACP 507",
+        "shortName": "ACP",
+        "logo": "img/default-team.png",
+        "coach": "",
+        "stadium": "Estadio ACP",
+        "played": 0,
+        "won": 0,
+        "drawn": 0,
+        "lost": 0,
+        "goalsFor": 0,
+        "goalsAgainst": 0,
+        "goalDifference": 0,
+        "points": 0
+      },
+      {
+        "id": 2,
+        "name": "BKS FC",
+        "shortName": "BKS",
+        "logo": "img/default-team.png",
+        "coach": "",
+        "stadium": "BKS Stadium",
+        "played": 0,
+        "won": 0,
+        "drawn": 0,
+        "lost": 0,
+        "goalsFor": 0,
+        "goalsAgainst": 0,
+        "goalDifference": 0,
+        "points": 0
       },
       {
         "id": 3,
-        "name": "Eliminación directa",
-        "positions": "9-12",
-        "color": "#ff4757"
+        "name": "Coiner FC",
+        "shortName": "COI",
+        "logo": "img/default-team.png",
+        "coach": "",
+        "stadium": "Campo Coiner",
+        "played": 0,
+        "won": 0,
+        "drawn": 0,
+        "lost": 0,
+        "goalsFor": 0,
+        "goalsAgainst": 0,
+        "goalDifference": 0,
+        "points": 0
+      },
+      {
+        "id": 4,
+        "name": "FC WEST SIDE",
+        "shortName": "FC ",
+        "logo": "img/default-team.png",
+        "coach": "",
+        "stadium": "West Side Arena",
+        "played": 0,
+        "won": 0,
+        "drawn": 0,
+        "lost": 0,
+        "goalsFor": 0,
+        "goalsAgainst": 0,
+        "goalDifference": 0,
+        "points": 0
+      },
+      {
+        "id": 5,
+        "name": "Humacao FC",
+        "shortName": "HUM",
+        "logo": "img/default-team.png",
+        "coach": "",
+        "stadium": "Estadio Humacao",
+        "played": 0,
+        "won": 0,
+        "drawn": 0,
+        "lost": 0,
+        "goalsFor": 0,
+        "goalsAgainst": 0,
+        "goalDifference": 0,
+        "points": 0
+      },
+      {
+        "id": 6,
+        "name": "Jumpers FC",
+        "shortName": "JUM",
+        "logo": "img/default-team.png",
+        "coach": "",
+        "stadium": "Jumpers Arena",
+        "played": 0,
+        "won": 0,
+        "drawn": 0,
+        "lost": 0,
+        "goalsFor": 0,
+        "goalsAgainst": 0,
+        "goalDifference": 0,
+        "points": 0
+      },
+      {
+        "id": 7,
+        "name": "LOS PLEBES Tk",
+        "shortName": "LOS",
+        "logo": "img/default-team.png",
+        "coach": "",
+        "stadium": "Estadio Los Plebes",
+        "played": 0,
+        "won": 0,
+        "drawn": 0,
+        "lost": 0,
+        "goalsFor": 0,
+        "goalsAgainst": 0,
+        "goalDifference": 0,
+        "points": 0
+      },
+      {
+        "id": 8,
+        "name": "Punta Coco FC",
+        "shortName": "PUN",
+        "logo": "img/default-team.png",
+        "coach": "",
+        "stadium": "Punta Coco Field",
+        "played": 0,
+        "won": 0,
+        "drawn": 0,
+        "lost": 0,
+        "goalsFor": 0,
+        "goalsAgainst": 0,
+        "goalDifference": 0,
+        "points": 0
+      },
+      {
+        "id": 9,
+        "name": "Pura Vibra",
+        "shortName": "PUR",
+        "logo": "img/default-team.png",
+        "coach": "",
+        "stadium": "Vibra Stadium",
+        "played": 0,
+        "won": 0,
+        "drawn": 0,
+        "lost": 0,
+        "goalsFor": 0,
+        "goalsAgainst": 0,
+        "goalDifference": 0,
+        "points": 0
+      },
+      {
+        "id": 10,
+        "name": "Rayos X FC",
+        "shortName": "RAY",
+        "logo": "img/default-team.png",
+        "coach": "",
+        "stadium": "Rayos Stadium",
+        "played": 0,
+        "won": 0,
+        "drawn": 0,
+        "lost": 0,
+        "goalsFor": 0,
+        "goalsAgainst": 0,
+        "goalDifference": 0,
+        "points": 0
+      },
+      {
+        "id": 11,
+        "name": "Tiki Taka FC",
+        "shortName": "TIK",
+        "logo": "img/default-team.png",
+        "coach": "",
+        "stadium": "Tiki Taka Field",
+        "played": 0,
+        "won": 0,
+        "drawn": 0,
+        "lost": 0,
+        "goalsFor": 0,
+        "goalsAgainst": 0,
+        "goalDifference": 0,
+        "points": 0
+      },
+      {
+        "id": 12,
+        "name": "WEST SIDE PTY",
+        "shortName": "WES",
+        "logo": "img/default-team.png",
+        "coach": "",
+        "stadium": "West Side Stadium",
+        "played": 0,
+        "won": 0,
+        "drawn": 0,
+        "lost": 0,
+        "goalsFor": 0,
+        "goalsAgainst": 0,
+        "goalDifference": 0,
+        "points": 0
       }
-    ]
+    ],
+    "matches": [],
+    "standings": [],
+    "settings": {
+      "seasonName": "Temporada 2025",
+      "pointsWin": 3,
+      "pointsDraw": 1,
+      "pointsLoss": 0
+    },
+    "currentBracket": null
   },
-  "bracket": null,
+  "players": [
+    {
+      "id": 1754065150137,
+      "name": "sdsdsd",
+      "clubId": 1754065116025,
+      "clubName": "cc",
+      "position": "Jugador",
+      "age": 25,
+      "number": 1,
+      "nationality": "Panamá",
+      "photo": "",
+      "registeredAt": "2025-08-01T16:19:10.137Z",
+      "goals": 2,
+      "assists": 1,
+      "updatedAt": "2025-08-01T16:19:14.876Z"
+    },
+    {
+      "id": 1754065151703,
+      "name": "sdsd",
+      "clubId": 1754065128432,
+      "clubName": "ff",
+      "position": "Jugador",
+      "age": 25,
+      "number": 1,
+      "nationality": "Panamá",
+      "photo": "",
+      "registeredAt": "2025-08-01T16:19:11.703Z",
+      "goals": 1,
+      "assists": 1,
+      "updatedAt": "2025-08-01T16:19:20.238Z"
+    }
+  ],
   "clubs": [
     {
       "id": 1,
@@ -121,42 +420,11 @@
       "logo": "/img/West Side PTY.jpg"
     }
   ],
-  "players": [
-    {
-      "id": 1754065150137,
-      "name": "sdsdsd",
-      "clubId": 1754065116025,
-      "clubName": "cc",
-      "position": "Jugador",
-      "age": 25,
-      "number": 1,
-      "nationality": "Panamá",
-      "photo": "",
-      "registeredAt": "2025-08-01T16:19:10.137Z",
-      "goals": 2,
-      "assists": 1,
-      "updatedAt": "2025-08-01T16:19:14.876Z"
-    },
-    {
-      "id": 1754065151703,
-      "name": "sdsd",
-      "clubId": 1754065128432,
-      "clubName": "ff",
-      "position": "Jugador",
-      "age": 25,
-      "number": 1,
-      "nationality": "Panamá",
-      "photo": "",
-      "registeredAt": "2025-08-01T16:19:11.703Z",
-      "goals": 1,
-      "assists": 1,
-      "updatedAt": "2025-08-01T16:19:20.238Z"
-    }
-  ],
   "clips": [],
   "stats": {
     "total_clips": 0,
     "total_views": 0,
     "total_likes": 0
-  }
+  },
+  "lastQuickSave": "2025-08-01T23:35:20.547Z"
 }
