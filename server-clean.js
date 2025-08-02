@@ -42,6 +42,12 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
+// Debug: Verificar configuración de Cloudinary
+console.log('🔧 Configuración Cloudinary:');
+console.log('  - Cloud Name:', process.env.CLOUDINARY_CLOUD_NAME ? '✅ Configurado' : '❌ No configurado');
+console.log('  - API Key:', process.env.CLOUDINARY_API_KEY ? '✅ Configurado' : '❌ No configurado');
+console.log('  - API Secret:', process.env.CLOUDINARY_API_SECRET ? '✅ Configurado' : '❌ No configurado');
+
 // ==================== MIDDLEWARE ====================
 app.use(cors());
 app.use(express.json());
@@ -307,8 +313,16 @@ app.post('/api/teams', uploadImage.single('logo'), async (req, res) => {
         
         // Procesar logo si se subió
         if (req.file) {
+            console.log('📁 Procesando archivo:', {
+                originalname: req.file.originalname,
+                mimetype: req.file.mimetype,
+                size: req.file.size
+            });
+            
             if (cloudinary.config().cloud_name) {
                 try {
+                    console.log('☁️ Subiendo imagen a Cloudinary...');
+                    
                     // Convertir buffer a base64 para Cloudinary
                     const b64 = Buffer.from(req.file.buffer).toString('base64');
                     const dataURI = `data:${req.file.mimetype};base64,${b64}`;
@@ -319,16 +333,28 @@ app.post('/api/teams', uploadImage.single('logo'), async (req, res) => {
                         overwrite: true,
                         resource_type: 'image'
                     });
+                    
                     logoUrl = result.secure_url;
-                    console.log('✅ Logo subido a Cloudinary:', logoUrl);
+                    console.log('✅ Logo subido exitosamente a Cloudinary:', logoUrl);
+                    
                 } catch (cloudinaryError) {
-                    console.error('❌ Error subiendo a Cloudinary:', cloudinaryError);
-                    // Fallback: no guardar imagen local en Render (se perdería)
-                    logoUrl = null;
+                    console.error('❌ Error detallado subiendo a Cloudinary:');
+                    console.error('  - Mensaje:', cloudinaryError.message);
+                    console.error('  - Código:', cloudinaryError.http_code);
+                    console.error('  - Error completo:', cloudinaryError);
+                    
+                    // Devolver error específico al frontend
+                    return res.status(500).json({ 
+                        error: 'Error subiendo imagen a Cloudinary: ' + cloudinaryError.message,
+                        details: 'Verifica la configuración de Cloudinary en las variables de entorno'
+                    });
                 }
             } else {
-                console.warn('⚠️ Cloudinary no configurado, logo no se guardará');
-                logoUrl = null;
+                console.warn('⚠️ Cloudinary no configurado correctamente');
+                return res.status(500).json({ 
+                    error: 'Cloudinary no está configurado',
+                    details: 'Faltan variables de entorno: CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET'
+                });
             }
         }
         
