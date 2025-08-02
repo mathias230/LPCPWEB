@@ -331,7 +331,9 @@ app.post('/api/teams', uploadImage.single('logo'), async (req, res) => {
                         folder: 'lpcp/teams',
                         public_id: `team_${Date.now()}`,
                         overwrite: true,
-                        resource_type: 'image'
+                        resource_type: 'image',
+                        timeout: 60000, // 60 segundos timeout
+                        chunk_size: 6000000 // 6MB chunks
                     });
                     
                     logoUrl = result.secure_url;
@@ -465,21 +467,49 @@ app.post('/api/clubs', uploadImage.single('logo'), async (req, res) => {
         
         // Procesar logo si se subió
         if (req.file) {
+            console.log('📁 Procesando logo de club:', {
+                originalname: req.file.originalname,
+                mimetype: req.file.mimetype,
+                size: req.file.size
+            });
+            
             if (cloudinary.config().cloud_name) {
                 try {
-                    const result = await cloudinary.uploader.upload(req.file.path, {
+                    console.log('☁️ Subiendo logo de club a Cloudinary...');
+                    
+                    // Convertir buffer a base64 para Cloudinary
+                    const b64 = Buffer.from(req.file.buffer).toString('base64');
+                    const dataURI = `data:${req.file.mimetype};base64,${b64}`;
+                    
+                    const result = await cloudinary.uploader.upload(dataURI, {
                         folder: 'lpcp/clubs',
                         public_id: `club_${Date.now()}`,
-                        overwrite: true
+                        overwrite: true,
+                        resource_type: 'image',
+                        timeout: 60000,
+                        chunk_size: 6000000
                     });
+                    
                     logoUrl = result.secure_url;
-                    console.log('✅ Logo de club subido a Cloudinary:', logoUrl);
+                    console.log('✅ Logo de club subido exitosamente a Cloudinary:', logoUrl);
+                    
                 } catch (cloudinaryError) {
-                    console.error('❌ Error subiendo logo de club a Cloudinary:', cloudinaryError);
-                    logoUrl = `/uploads/${req.file.filename}`;
+                    console.error('❌ Error detallado subiendo logo de club a Cloudinary:');
+                    console.error('  - Mensaje:', cloudinaryError.message);
+                    console.error('  - Código:', cloudinaryError.http_code);
+                    console.error('  - Error completo:', cloudinaryError);
+                    
+                    return res.status(500).json({ 
+                        error: 'Error subiendo logo de club a Cloudinary: ' + cloudinaryError.message,
+                        details: 'Verifica la configuración de Cloudinary en las variables de entorno'
+                    });
                 }
             } else {
-                logoUrl = `/uploads/${req.file.filename}`;
+                console.warn('⚠️ Cloudinary no configurado para clubes');
+                return res.status(500).json({ 
+                    error: 'Cloudinary no está configurado',
+                    details: 'Faltan variables de entorno de Cloudinary'
+                });
             }
         }
         
