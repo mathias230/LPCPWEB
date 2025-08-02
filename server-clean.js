@@ -1072,6 +1072,54 @@ app.delete('/api/clips/:id', async (req, res) => {
     }
 });
 
+// Obtener clips con paginación y filtros
+app.get('/api/clips', (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const category = req.query.category || 'all';
+        const limit = 12; // Clips por página
+        
+        console.log(`🎬 Solicitando clips - Página: ${page}, Categoría: ${category}`);
+        
+        // Filtrar clips por categoría
+        let filteredClips = clips;
+        if (category !== 'all') {
+            filteredClips = clips.filter(clip => 
+                clip.club && clip.club.toLowerCase() === category.toLowerCase()
+            );
+        }
+        
+        // Ordenar por fecha de subida (más recientes primero)
+        filteredClips.sort((a, b) => new Date(b.upload_date) - new Date(a.upload_date));
+        
+        // Paginación
+        const startIndex = (page - 1) * limit;
+        const endIndex = startIndex + limit;
+        const paginatedClips = filteredClips.slice(startIndex, endIndex);
+        
+        // Verificar si hay más páginas
+        const hasMore = endIndex < filteredClips.length;
+        
+        console.log(`✅ Enviando ${paginatedClips.length} clips de ${filteredClips.length} total`);
+        
+        res.json({
+            clips: paginatedClips,
+            has_more: hasMore,
+            total: filteredClips.length,
+            page: page,
+            category: category
+        });
+        
+    } catch (error) {
+        console.error('❌ Error obteniendo clips:', error);
+        res.status(500).json({ 
+            clips: [], 
+            has_more: false, 
+            error: 'Error obteniendo clips' 
+        });
+    }
+});
+
 // Obtener estadísticas
 app.get('/api/stats', (req, res) => {
     res.json(stats);
