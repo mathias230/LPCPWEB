@@ -31,7 +31,7 @@ mongoose.connect(MONGODB_URI)
         console.log('💾 Usando MongoDB para persistencia de datos');
     })
     .catch((error) => {
-        console.error('❌ Error conectando a MongoDB:', error);
+        console.error('❌ Error conectando a MongoDB:', error.message);
         console.log('⚠️ Continuando con archivos locales como fallback');
         useDatabase = false;
     });
@@ -264,6 +264,8 @@ async function loadTournamentData() {
             console.error('❌ Error cargando desde MongoDB:', error);
             console.log('⚠️ Continuando con carga desde archivos locales...');
         }
+    } else {
+        console.log('📁 MongoDB no disponible, cargando desde archivos locales...');
     }
     
     // PASO 2: Cargar desde archivos locales como fallback
@@ -271,6 +273,13 @@ async function loadTournamentData() {
     await loadFromLocalFiles();
     
     console.log('✅ Carga de datos completada');
+    
+    // PASO 3: Verificar que los datos se cargaron correctamente
+    console.log('🔍 Verificando datos cargados:');
+    console.log(`   - Equipos: ${teams ? teams.length : 0}`);
+    console.log(`   - Jugadores: ${players ? players.length : 0}`);
+    console.log(`   - Clubes: ${clubs ? clubs.length : 0}`);
+    console.log(`   - Clips: ${clips ? clips.length : 0}`);
 }
 
 // Función para cargar datos desde MongoDB
