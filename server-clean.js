@@ -309,19 +309,26 @@ app.post('/api/teams', uploadImage.single('logo'), async (req, res) => {
         if (req.file) {
             if (cloudinary.config().cloud_name) {
                 try {
-                    const result = await cloudinary.uploader.upload(req.file.path, {
+                    // Convertir buffer a base64 para Cloudinary
+                    const b64 = Buffer.from(req.file.buffer).toString('base64');
+                    const dataURI = `data:${req.file.mimetype};base64,${b64}`;
+                    
+                    const result = await cloudinary.uploader.upload(dataURI, {
                         folder: 'lpcp/teams',
                         public_id: `team_${Date.now()}`,
-                        overwrite: true
+                        overwrite: true,
+                        resource_type: 'image'
                     });
                     logoUrl = result.secure_url;
                     console.log('✅ Logo subido a Cloudinary:', logoUrl);
                 } catch (cloudinaryError) {
                     console.error('❌ Error subiendo a Cloudinary:', cloudinaryError);
-                    logoUrl = `/uploads/${req.file.filename}`;
+                    // Fallback: no guardar imagen local en Render (se perdería)
+                    logoUrl = null;
                 }
             } else {
-                logoUrl = `/uploads/${req.file.filename}`;
+                console.warn('⚠️ Cloudinary no configurado, logo no se guardará');
+                logoUrl = null;
             }
         }
         
