@@ -176,7 +176,7 @@ const TournamentSettings = mongoose.model('TournamentSettings', TournamentSettin
 
 // VARIABLES CRÍTICAS - AHORA CON FALLBACK A MONGODB
 let players = []; // Fallback local
-let clubs = [];   // Fallback local
+let clubs = []; // Array vacío para que el usuario agregue sus propios clubes
 let useDatabase = false; // Flag para saber si usar MongoDB
 
 // Tabla de posiciones dinámica (se genera automáticamente basada en equipos y partidos)
@@ -210,21 +210,12 @@ let settings = {
 // Variable para el bracket actual de playoffs (mantenida por compatibilidad)
 let currentBracket = null;
 
-// Equipos de la Liga Panameña de Clubes Pro
-let teams = [
-    { id: 1, name: 'ACP 507', founded: 2020, stadium: 'Estadio ACP', logo: 'img/default-team.png' },
-    { id: 2, name: 'BKS FC', founded: 2023, stadium: 'BKS Stadium', logo: 'img/default-team.png' },
-    { id: 3, name: 'Coiner FC', founded: 2019, stadium: 'Campo Coiner', logo: 'img/default-team.png' },
-    { id: 4, name: 'FC WEST SIDE', founded: 2021, stadium: 'West Side Arena', logo: 'img/default-team.png' },
-    { id: 5, name: 'Humacao FC', founded: 2020, stadium: 'Estadio Humacao', logo: 'img/default-team.png' },
-    { id: 6, name: 'Jumpers FC', founded: 2022, stadium: 'Jumpers Arena', logo: 'img/default-team.png' },
-    { id: 7, name: 'LOS PLEBES Tk', founded: 2021, stadium: 'Estadio Los Plebes', logo: 'img/default-team.png' },
-    { id: 8, name: 'Punta Coco FC', founded: 2018, stadium: 'Punta Coco Field', logo: 'img/default-team.png' },
-    { id: 9, name: 'Pura Vibra', founded: 2022, stadium: 'Vibra Stadium', logo: 'img/default-team.png' },
-    { id: 10, name: 'Rayos X FC', founded: 2020, stadium: 'Rayos Stadium', logo: 'img/default-team.png' },
-    { id: 11, name: 'Tiki Taka FC', founded: 2021, stadium: 'Tiki Taka Field', logo: 'img/default-team.png' },
-    { id: 12, name: 'WEST SIDE PTY', founded: 2023, stadium: 'West Side Stadium', logo: 'img/default-team.png' }
-];
+// Equipos de la Liga Panameña de Clubes Pro (array vacío para datos personalizados)
+let teams = [];
+
+
+
+
 
 // Cargar datos existentes solo para clips
 const clipsFile = path.join(dataDir, 'clips.json');
@@ -2982,6 +2973,427 @@ console.log('📊 Inicializando tabla de posiciones...');
 updateStandingsFromMatches();
 console.log(`✅ Tabla de posiciones inicializada con ${standings.length} equipos`);
 
+// ==================== TEAMS API ENDPOINTS ====================
+
+// Eliminar un equipo
+app.delete('/api/teams/:id', async (req, res) => {
+    try {
+        const teamId = req.params.id;
+        console.log('🗑️ Intentando eliminar equipo con ID:', teamId);
+        
+        // Buscar equipo en el array teams (flexible: string, número, o ObjectId)
+        const teamIndex = teams.findIndex(t => 
+            t.id == teamId || 
+            t.id === parseInt(teamId) || 
+            t.id?.toString() === teamId
+        );
+        
+        if (teamIndex === -1) {
+            console.log('❌ Equipo no encontrado. IDs disponibles:', teams.map(t => ({ id: t.id, name: t.name })));
+            return res.status(404).json({ error: 'Equipo no encontrado' });
+        }
+        
+        // Obtener datos del equipo antes de eliminarlo
+        const team = teams[teamIndex];
+        const teamName = team.name;
+        console.log('✅ Equipo encontrado:', teamName);
+        
+        // Eliminar logo de Cloudinary si existe
+        if (team.logo && team.logo.includes('cloudinary')) {
+            try {
+                const publicId = team.logo.split('/').pop().split('.')[0];
+                await cloudinary.uploader.destroy(`lpcp/teams/${publicId}`);
+                console.log('🗑️ Logo eliminado de Cloudinary');
+            } catch (error) {
+                console.warn('⚠️ No se pudo eliminar la imagen del equipo:', error);
+            }
+        }
+        
+        // Eliminar del array teams principal
+        teams.splice(teamIndex, 1);
+        console.log('✅ Equipo eliminado del array teams');
+        
+        // Eliminar también de tournament.teams si existe
+        const tournamentTeamIndex = tournament.teams.findIndex(t => 
+            t.name === teamName || t.id === teamId
+        );
+        if (tournamentTeamIndex !== -1) {
+            tournament.teams.splice(tournamentTeamIndex, 1);
+            console.log('✅ Equipo eliminado de tournament.teams');
+        }
+        
+        // Eliminar jugadores asociados al equipo
+        const playersToRemove = players.filter(p => p.clubName === teamName);
+        players = players.filter(p => p.clubName !== teamName);
+        console.log(`✅ ${playersToRemove.length} jugadores eliminados`);
+        
+        // Eliminar club asociado si existe
+        const clubIndex = clubs.findIndex(c => c.name === teamName);
+        if (clubIndex !== -1) {
+            clubs.splice(clubIndex, 1);
+            console.log('✅ Club asociado eliminado');
+        }
+        
+        // Actualizar partidos que involucren a este equipo
+        if (tournament.matches) {
+            tournament.matches = tournament.matches.filter(match => 
+                match.homeTeam !== teamId && match.awayTeam !== teamId
+            );
+            console.log('✅ Partidos actualizados');
+        }
+        
+        // Guardar cambios
+        await saveData();
+        
+        // Emitir actualizaciones WebSocket
+        io.emit('teamsUpdate', teams);
+        io.emit('playersUpdate', players);
+        io.emit('clubsUpdate', clubs);
+        if (tournament.matches) {
+            io.emit('matchesUpdate', tournament.matches);
+        }
+        
+        res.json({ 
+            success: true, 
+            message: `Equipo "${teamName}" eliminado exitosamente`,
+            deletedTeam: teamName,
+            playersRemoved: playersToRemove.length
+        });
+        
+    } catch (error) {
+        console.error('❌ Error eliminando equipo:', error);
+        res.status(500).json({ 
+            error: 'Error interno del servidor al eliminar equipo',
+            details: error.message 
+        });
+    }
+});
+
+// Crear un nuevo equipo
+app.post('/api/teams', uploadImage.single('teamLogo'), async (req, res) => {
+    try {
+        const { name, founded, stadium } = req.body;
+        
+        if (!name) {
+            return res.status(400).json({ error: 'El nombre del equipo es requerido' });
+        }
+        
+        // Verificar que no exista un equipo con el mismo nombre
+        const existingTeam = teams.find(t => t.name.toLowerCase() === name.toLowerCase());
+        if (existingTeam) {
+            return res.status(400).json({ error: 'Ya existe un equipo con ese nombre' });
+        }
+        
+        let logoUrl = 'img/default-team.png';
+        
+        // Subir logo a Cloudinary si se proporcionó
+        if (req.file) {
+            try {
+                const result = await new Promise((resolve, reject) => {
+                    cloudinary.uploader.upload_stream(
+                        { resource_type: 'auto', folder: 'lpcp/teams' },
+                        (error, result) => {
+                            if (error) reject(error);
+                            else resolve(result);
+                        }
+                    ).end(req.file.buffer);
+                });
+                
+                logoUrl = result.secure_url;
+                console.log('✅ Logo subido a Cloudinary:', logoUrl);
+            } catch (error) {
+                console.warn('⚠️ Error subiendo logo a Cloudinary:', error);
+                // Continuar con logo por defecto si falla la subida
+            }
+        }
+        
+        // Crear nuevo equipo
+        const newTeam = {
+            id: Date.now(), // ID único basado en timestamp
+            name: name.trim(),
+            founded: founded ? parseInt(founded) : new Date().getFullYear(),
+            stadium: stadium ? stadium.trim() : '',
+            logo: logoUrl
+        };
+        
+        // Agregar al array de equipos
+        teams.push(newTeam);
+        
+        // Agregar también a tournament.teams para compatibilidad
+        const tournamentTeam = {
+            id: newTeam.id,
+            name: newTeam.name,
+            shortName: newTeam.name.substring(0, 3).toUpperCase(),
+            logo: newTeam.logo,
+            coach: '',
+            stadium: newTeam.stadium,
+            played: 0,
+            won: 0,
+            drawn: 0,
+            lost: 0,
+            goalsFor: 0,
+            goalsAgainst: 0,
+            goalDifference: 0,
+            points: 0
+        };
+        tournament.teams.push(tournamentTeam);
+        
+        // Crear club asociado automáticamente
+        const newClub = {
+            id: newTeam.id,
+            name: newTeam.name,
+            founded: newTeam.founded,
+            stadium: newTeam.stadium,
+            logo: newTeam.logo,
+            players: 0
+        };
+        clubs.push(newClub);
+        
+        // Guardar cambios
+        await saveData();
+        
+        // Emitir actualizaciones WebSocket
+        io.emit('teamsUpdate', teams);
+        io.emit('clubsUpdate', clubs);
+        
+        console.log('✅ Equipo creado exitosamente:', newTeam.name);
+        
+        res.status(201).json({
+            success: true,
+            team: newTeam,
+            club: newClub,
+            message: `Equipo "${newTeam.name}" creado exitosamente`
+        });
+        
+    } catch (error) {
+        console.error('❌ Error creando equipo:', error);
+        res.status(500).json({ 
+            error: 'Error interno del servidor al crear equipo',
+            details: error.message 
+        });
+    }
+});
+
+// Actualizar un equipo
+app.put('/api/teams/:id', uploadImage.single('teamLogo'), async (req, res) => {
+    try {
+        const teamId = req.params.id;
+        const { name, founded, stadium } = req.body;
+        
+        // Buscar equipo
+        const teamIndex = teams.findIndex(t => 
+            t.id == teamId || 
+            t.id === parseInt(teamId) || 
+            t.id?.toString() === teamId
+        );
+        
+        if (teamIndex === -1) {
+            return res.status(404).json({ error: 'Equipo no encontrado' });
+        }
+        
+        const team = teams[teamIndex];
+        const oldName = team.name;
+        
+        // Verificar nombre único (excluyendo el equipo actual)
+        if (name && name !== oldName) {
+            const existingTeam = teams.find(t => t.id != teamId && t.name.toLowerCase() === name.toLowerCase());
+            if (existingTeam) {
+                return res.status(400).json({ error: 'Ya existe un equipo con ese nombre' });
+            }
+        }
+        
+        let logoUrl = team.logo;
+        
+        // Subir nuevo logo si se proporcionó
+        if (req.file) {
+            try {
+                // Eliminar logo anterior de Cloudinary si existe
+                if (team.logo && team.logo.includes('cloudinary')) {
+                    const publicId = team.logo.split('/').pop().split('.')[0];
+                    await cloudinary.uploader.destroy(`lpcp/teams/${publicId}`);
+                }
+                
+                // Subir nuevo logo
+                const result = await new Promise((resolve, reject) => {
+                    cloudinary.uploader.upload_stream(
+                        { resource_type: 'auto', folder: 'lpcp/teams' },
+                        (error, result) => {
+                            if (error) reject(error);
+                            else resolve(result);
+                        }
+                    ).end(req.file.buffer);
+                });
+                
+                logoUrl = result.secure_url;
+            } catch (error) {
+                console.warn('⚠️ Error actualizando logo:', error);
+            }
+        }
+        
+        // Actualizar datos del equipo
+        if (name) team.name = name.trim();
+        if (founded) team.founded = parseInt(founded);
+        if (stadium !== undefined) team.stadium = stadium.trim();
+        team.logo = logoUrl;
+        
+        // Actualizar en tournament.teams
+        const tournamentTeamIndex = tournament.teams.findIndex(t => t.id == teamId);
+        if (tournamentTeamIndex !== -1) {
+            const tournamentTeam = tournament.teams[tournamentTeamIndex];
+            tournamentTeam.name = team.name;
+            tournamentTeam.shortName = team.name.substring(0, 3).toUpperCase();
+            tournamentTeam.logo = team.logo;
+            tournamentTeam.stadium = team.stadium;
+        }
+        
+        // Actualizar club asociado
+        const clubIndex = clubs.findIndex(c => c.id == teamId);
+        if (clubIndex !== -1) {
+            clubs[clubIndex].name = team.name;
+            clubs[clubIndex].founded = team.founded;
+            clubs[clubIndex].stadium = team.stadium;
+            clubs[clubIndex].logo = team.logo;
+        }
+        
+        // Actualizar jugadores si cambió el nombre del equipo
+        if (name && name !== oldName) {
+            players.forEach(player => {
+                if (player.clubName === oldName) {
+                    player.clubName = team.name;
+                }
+            });
+        }
+        
+        // Guardar cambios
+        await saveData();
+        
+        // Emitir actualizaciones WebSocket
+        io.emit('teamsUpdate', teams);
+        io.emit('clubsUpdate', clubs);
+        io.emit('playersUpdate', players);
+        
+        res.json({
+            success: true,
+            team: team,
+            message: `Equipo actualizado exitosamente`
+        });
+        
+    } catch (error) {
+        console.error('❌ Error actualizando equipo:', error);
+        res.status(500).json({ 
+            error: 'Error interno del servidor al actualizar equipo',
+            details: error.message 
+        });
+    }
+});
+
+// ==================== CLUBS API ENDPOINTS ====================
+
+// Eliminar un club
+app.delete('/api/clubs/:id', async (req, res) => {
+    try {
+        const clubId = req.params.id;
+        console.log('🗑️ Intentando eliminar club con ID:', clubId);
+        
+        // Buscar club
+        const clubIndex = clubs.findIndex(c => 
+            c.id == clubId || 
+            c.id === parseInt(clubId) || 
+            c.id?.toString() === clubId
+        );
+        
+        if (clubIndex === -1) {
+            return res.status(404).json({ error: 'Club no encontrado' });
+        }
+        
+        const club = clubs[clubIndex];
+        const clubName = club.name;
+        
+        // Eliminar club
+        clubs.splice(clubIndex, 1);
+        
+        // Eliminar jugadores asociados
+        const playersToRemove = players.filter(p => p.clubName === clubName);
+        players = players.filter(p => p.clubName !== clubName);
+        
+        // Guardar cambios
+        await saveData();
+        
+        // Emitir actualizaciones WebSocket
+        io.emit('clubsUpdate', clubs);
+        io.emit('playersUpdate', players);
+        
+        res.json({ 
+            success: true, 
+            message: `Club "${clubName}" eliminado exitosamente`,
+            playersRemoved: playersToRemove.length
+        });
+        
+    } catch (error) {
+        console.error('❌ Error eliminando club:', error);
+        res.status(500).json({ 
+            error: 'Error interno del servidor al eliminar club',
+            details: error.message 
+        });
+    }
+});
+
+// ==================== PLAYERS API ENDPOINTS ====================
+
+// Eliminar un jugador
+app.delete('/api/players/:id', async (req, res) => {
+    try {
+        const playerId = req.params.id;
+        console.log('🗑️ Intentando eliminar jugador con ID:', playerId);
+        
+        // Buscar jugador
+        const playerIndex = players.findIndex(p => 
+            p.id == playerId || 
+            p.id === parseInt(playerId) || 
+            p.id?.toString() === playerId
+        );
+        
+        if (playerIndex === -1) {
+            return res.status(404).json({ error: 'Jugador no encontrado' });
+        }
+        
+        const player = players[playerIndex];
+        const playerName = player.name;
+        
+        // Eliminar foto de Cloudinary si existe
+        if (player.photo && player.photo.includes('cloudinary')) {
+            try {
+                const publicId = player.photo.split('/').pop().split('.')[0];
+                await cloudinary.uploader.destroy(`lpcp/players/${publicId}`);
+                console.log('🗑️ Foto eliminada de Cloudinary');
+            } catch (error) {
+                console.warn('⚠️ No se pudo eliminar la foto del jugador:', error);
+            }
+        }
+        
+        // Eliminar jugador
+        players.splice(playerIndex, 1);
+        
+        // Guardar cambios
+        await saveData();
+        
+        // Emitir actualizaciones WebSocket
+        io.emit('playersUpdate', players);
+        
+        res.json({ 
+            success: true, 
+            message: `Jugador "${playerName}" eliminado exitosamente`
+        });
+        
+    } catch (error) {
+        console.error('❌ Error eliminando jugador:', error);
+        res.status(500).json({ 
+            error: 'Error interno del servidor al eliminar jugador',
+            details: error.message 
+        });
+    }
+});
+
 // ==================== WEBSOCKET CONFIGURATION ====================
 
 // Configuración de WebSocket para actualizaciones en tiempo real
@@ -3010,11 +3422,232 @@ io.on('connection', (socket) => {
     });
 });
 
+// ==================== ENDPOINTS DE LIMPIEZA MONGODB ====================
+
+// Limpiar todos los equipos de MongoDB
+app.delete('/api/admin/cleanup/teams', async (req, res) => {
+    try {
+        if (!useDatabase) {
+            return res.status(400).json({ error: 'MongoDB no está disponible' });
+        }
+        
+        console.log('🧹 Limpiando todos los equipos de MongoDB...');
+        const result = await Team.deleteMany({});
+        console.log(`✅ ${result.deletedCount} equipos eliminados de MongoDB`);
+        
+        // Limpiar también arrays locales
+        teams.length = 0;
+        tournament.teams.length = 0;
+        
+        // Emitir actualización
+        io.emit('teamsUpdate', teams.length);
+        
+        res.json({ 
+            success: true, 
+            message: `${result.deletedCount} equipos eliminados de MongoDB`,
+            deletedCount: result.deletedCount
+        });
+    } catch (error) {
+        console.error('❌ Error limpiando equipos de MongoDB:', error);
+        res.status(500).json({ error: 'Error limpiando equipos de MongoDB' });
+    }
+});
+
+// Limpiar todos los clubes de MongoDB
+app.delete('/api/admin/cleanup/clubs', async (req, res) => {
+    try {
+        if (!useDatabase) {
+            return res.status(400).json({ error: 'MongoDB no está disponible' });
+        }
+        
+        console.log('🧹 Limpiando todos los clubes de MongoDB...');
+        const result = await Club.deleteMany({});
+        console.log(`✅ ${result.deletedCount} clubes eliminados de MongoDB`);
+        
+        // Limpiar también array local
+        clubs.length = 0;
+        
+        // Emitir actualización
+        io.emit('clubsUpdate', clubs.length);
+        
+        res.json({ 
+            success: true, 
+            message: `${result.deletedCount} clubes eliminados de MongoDB`,
+            deletedCount: result.deletedCount
+        });
+    } catch (error) {
+        console.error('❌ Error limpiando clubes de MongoDB:', error);
+        res.status(500).json({ error: 'Error limpiando clubes de MongoDB' });
+    }
+});
+
+// Limpiar todos los jugadores de MongoDB
+app.delete('/api/admin/cleanup/players', async (req, res) => {
+    try {
+        if (!useDatabase) {
+            return res.status(400).json({ error: 'MongoDB no está disponible' });
+        }
+        
+        console.log('🧹 Limpiando todos los jugadores de MongoDB...');
+        const result = await Player.deleteMany({});
+        console.log(`✅ ${result.deletedCount} jugadores eliminados de MongoDB`);
+        
+        // Limpiar también array local
+        players.length = 0;
+        
+        // Emitir actualización
+        io.emit('playersUpdate', players.length);
+        
+        res.json({ 
+            success: true, 
+            message: `${result.deletedCount} jugadores eliminados de MongoDB`,
+            deletedCount: result.deletedCount
+        });
+    } catch (error) {
+        console.error('❌ Error limpiando jugadores de MongoDB:', error);
+        res.status(500).json({ error: 'Error limpiando jugadores de MongoDB' });
+    }
+});
+
+// Limpiar todos los partidos de MongoDB
+app.delete('/api/admin/cleanup/matches', async (req, res) => {
+    try {
+        if (!useDatabase) {
+            return res.status(400).json({ error: 'MongoDB no está disponible' });
+        }
+        
+        console.log('🧹 Limpiando todos los partidos de MongoDB...');
+        const result = await Match.deleteMany({});
+        console.log(`✅ ${result.deletedCount} partidos eliminados de MongoDB`);
+        
+        // Limpiar también array local
+        matches.length = 0;
+        
+        res.json({ 
+            success: true, 
+            message: `${result.deletedCount} partidos eliminados de MongoDB`,
+            deletedCount: result.deletedCount
+        });
+    } catch (error) {
+        console.error('❌ Error limpiando partidos de MongoDB:', error);
+        res.status(500).json({ error: 'Error limpiando partidos de MongoDB' });
+    }
+});
+
+// Limpiar TODA la base de datos MongoDB (PELIGROSO - usar con cuidado)
+app.delete('/api/admin/cleanup/all', async (req, res) => {
+    try {
+        if (!useDatabase) {
+            return res.status(400).json({ error: 'MongoDB no está disponible' });
+        }
+        
+        console.log('🧹 LIMPIEZA TOTAL DE MONGODB - ELIMINANDO TODO...');
+        
+        const teamsResult = await Team.deleteMany({});
+        const clubsResult = await Club.deleteMany({});
+        const playersResult = await Player.deleteMany({});
+        const matchesResult = await Match.deleteMany({});
+        
+        console.log(`✅ LIMPIEZA COMPLETA:`);
+        console.log(`   - ${teamsResult.deletedCount} equipos eliminados`);
+        console.log(`   - ${clubsResult.deletedCount} clubes eliminados`);
+        console.log(`   - ${playersResult.deletedCount} jugadores eliminados`);
+        console.log(`   - ${matchesResult.deletedCount} partidos eliminados`);
+        
+        // Limpiar también arrays locales
+        teams.length = 0;
+        clubs.length = 0;
+        players.length = 0;
+        matches.length = 0;
+        tournament.teams.length = 0;
+        
+        // Emitir actualizaciones
+        io.emit('teamsUpdate', teams.length);
+        io.emit('clubsUpdate', clubs.length);
+        io.emit('playersUpdate', players.length);
+        
+        const totalDeleted = teamsResult.deletedCount + clubsResult.deletedCount + 
+                           playersResult.deletedCount + matchesResult.deletedCount;
+        
+        res.json({ 
+            success: true, 
+            message: `Limpieza completa: ${totalDeleted} registros eliminados`,
+            details: {
+                teams: teamsResult.deletedCount,
+                clubs: clubsResult.deletedCount,
+                players: playersResult.deletedCount,
+                matches: matchesResult.deletedCount,
+                total: totalDeleted
+            }
+        });
+    } catch (error) {
+        console.error('❌ Error en limpieza total de MongoDB:', error);
+        res.status(500).json({ error: 'Error en limpieza total de MongoDB' });
+    }
+});
+
+// ==================== ENDPOINT DE LIMPIEZA MONGODB ====================
+
+// Limpiar TODA la base de datos MongoDB (PELIGROSO - usar con cuidado)
+app.delete('/api/admin/cleanup/all', async (req, res) => {
+    try {
+        if (!useDatabase) {
+            return res.status(400).json({ error: 'MongoDB no está disponible' });
+        }
+        
+        console.log('🧹 LIMPIEZA TOTAL DE MONGODB - ELIMINANDO TODO...');
+        
+        const teamsResult = await Team.deleteMany({});
+        const clubsResult = await Club.deleteMany({});
+        const playersResult = await Player.deleteMany({});
+        const matchesResult = await Match.deleteMany({});
+        
+        console.log(`✅ LIMPIEZA COMPLETA:`);
+        console.log(`   - ${teamsResult.deletedCount} equipos eliminados`);
+        console.log(`   - ${clubsResult.deletedCount} clubes eliminados`);
+        console.log(`   - ${playersResult.deletedCount} jugadores eliminados`);
+        console.log(`   - ${matchesResult.deletedCount} partidos eliminados`);
+        
+        // Limpiar también arrays locales
+        teams.length = 0;
+        clubs.length = 0;
+        players.length = 0;
+        matches.length = 0;
+        tournament.teams.length = 0;
+        
+        // Emitir actualizaciones
+        io.emit('teamsUpdate', teams.length);
+        io.emit('clubsUpdate', clubs.length);
+        io.emit('playersUpdate', players.length);
+        
+        const totalDeleted = teamsResult.deletedCount + clubsResult.deletedCount + 
+                           playersResult.deletedCount + matchesResult.deletedCount;
+        
+        res.json({ 
+            success: true, 
+            message: `Limpieza completa: ${totalDeleted} registros eliminados`,
+            details: {
+                teams: teamsResult.deletedCount,
+                clubs: clubsResult.deletedCount,
+                players: playersResult.deletedCount,
+                matches: matchesResult.deletedCount,
+                total: totalDeleted
+            }
+        });
+    } catch (error) {
+        console.error('❌ Error en limpieza total de MongoDB:', error);
+        res.status(500).json({ error: 'Error en limpieza total de MongoDB' });
+    }
+});
+
+// Inicializar datos al arrancar el servidor
+loadTournamentData();
+
 // Iniciar servidor
 server.listen(PORT, () => {
-    console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
-    console.log(`📁 Archivos subidos en: ${uploadsDir}`);
-    console.log(`💾 Datos guardados en: ${dataDir}`);
+    console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
+    console.log(`📱 Panel admin: http://localhost:${PORT}/admin.html`);
+    console.log(`🌐 Sitio web: http://localhost:${PORT}`);
 });
 
 // BACKUP DE EMERGENCIA: Ejecutar antes de cerrar el servidor

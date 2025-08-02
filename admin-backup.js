@@ -103,17 +103,10 @@ window.deleteTeam = async function(teamId) {
         if (typeof showNotification === 'function') {
             showNotification('Error de conexión con el servidor', 'error');
         } else {
-            alert(' Error de conexión con el servidor');
+            alert('❌ Error de conexión con el servidor');
         }
     }
 };
-
-// FUNCIÓN DE PRUEBA SIMPLE
-window.testButton = function() {
-    alert('¡Los botones SÍ funcionan! El problema está resuelto.');
-    console.log(' Función de prueba ejecutada correctamente');
-};
-
 let matches = [];
 let currentTab = 'teams';
 let editingPlayerId = null;
@@ -4042,48 +4035,5 @@ window.editTeam = editTeam;
 window.deleteTeam = deleteTeam;
 window.cancelTeamEdit = cancelTeamEdit;
 window.addEditButtonsToTeams = addEditButtonsToTeams;
-
-// Función de limpieza de MongoDB
-window.cleanupMongoDB = async function() {
-    const resultDiv = document.getElementById('cleanupResult');
-    const button = event.target;
-    
-    if (!confirm('⚠️ ¿Estás seguro de que quieres eliminar TODOS los datos de MongoDB Atlas?\n\nEsto incluye: equipos, clubes, jugadores y partidos.\n\nEsta acción NO se puede deshacer.')) {
-        return;
-    }
-    
-    try {
-        button.disabled = true;
-        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Limpiando...';
-        resultDiv.innerHTML = '<span style="color: #ffa502;">🔄 Limpiando MongoDB Atlas...</span>';
-        
-        const response = await fetch('/api/admin/cleanup/all', { method: 'DELETE' });
-        const result = await response.json();
-        
-        if (response.ok && result.success) {
-            resultDiv.innerHTML = `
-                <div style="color: #2ed573;">
-                    <i class="fas fa-check-circle"></i> <strong>MongoDB Atlas limpiado</strong><br>
-                    <small>Total: ${result.details.total} registros eliminados</small>
-                </div>
-            `;
-            
-            setTimeout(() => {
-                loadTeams();
-                loadClubs();
-                resultDiv.innerHTML += '<br><span style="color: #00ff88;">Recarga la página (Ctrl+F5) para ver los cambios</span>';
-            }, 1000);
-            
-        } else {
-            resultDiv.innerHTML = `<span style="color: #ff4757;"><i class="fas fa-exclamation-triangle"></i> Error: ${result.error || 'Error desconocido'}</span>`;
-        }
-        
-    } catch (error) {
-        resultDiv.innerHTML = '<span style="color: #ff4757;"><i class="fas fa-exclamation-triangle"></i> Error de conexión</span>';
-    } finally {
-        button.disabled = false;
-        button.innerHTML = '<i class="fas fa-broom"></i> Limpiar MongoDB Atlas';
-    }
-};
 
 console.log('✅ Funciones globales expuestas correctamente');

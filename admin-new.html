@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Administración - LPCP</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        /* Estilos específicos para el panel de administración */
+        .admin-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .admin-header {
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .admin-header h1 {
+            margin: 0;
+            font-size: 2.5em;
+            font-weight: bold;
+        }
+
+        .admin-tabs {
+            display: flex;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+            overflow: hidden;
+        }
+
+        .tab-button {
+            flex: 1;
+            padding: 15px 20px;
+            background: #f8f9fa;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border-right: 1px solid #e9ecef;
+        }
+
+        .tab-button:last-child {
+            border-right: none;
+        }
+
+        .tab-button.active {
+            background: #007bff;
+            color: white;
+        }
+
+        .tab-button:hover:not(.active) {
+            background: #e9ecef;
+        }
+
+        .tab-content {
+            display: none;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .section-title {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #2c3e50;
+            margin: 0;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+        }
+
+        .form-container {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #495057;
+        }
+
+        .form-group input,
+        .form-group select {
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .team-card,
+        .player-card,
+        .club-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+
+        .team-card:hover,
+        .player-card:hover,
+        .club-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+            border-color: #007bff;
+        }
+
+        .team-header,
+        .player-header,
+        .club-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .team-logo,
+        .player-photo,
+        .club-logo {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            margin-right: 15px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #007bff, #0056b3);
+        }
+
+        .team-logo img,
+        .player-photo img,
+        .club-logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .team-initial,
+        .player-initial,
+        .club-initial {
+            color: white;
+            font-weight: bold;
+            font-size: 20px;
+        }
+
+        .team-header h3,
+        .player-header h3,
+        .club-header h3 {
+            margin: 0;
+            font-size: 1.3em;
+            color: #2c3e50;
+        }
+
+        .team-info,
+        .player-info,
+        .club-info {
+            margin-bottom: 15px;
+        }
+
+        .team-info p,
+        .player-info p,
+        .club-info p {
+            margin: 5px 0;
+            color: #6c757d;
+            font-size: 14px;
+        }
+
+        .team-actions,
+        .player-actions,
+        .club-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-edit,
+        .btn-delete {
+            flex: 1;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .btn-edit {
+            background: #ffc107;
+            color: #212529;
+        }
+
+        .btn-edit:hover {
+            background: #e0a800;
+            transform: translateY(-1px);
+        }
+
+        .btn-delete {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-delete:hover {
+            background: #c82333;
+            transform: translateY(-1px);
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 600;
+            z-index: 1000;
+            animation: slideIn 0.3s ease;
+        }
+
+        .notification-success {
+            background: #28a745;
+        }
+
+        .notification-error {
+            background: #dc3545;
+        }
+
+        .notification-info {
+            background: #17a2b8;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #6c757d;
+        }
+
+        .empty-state h3 {
+            margin-bottom: 10px;
+            color: #495057;
+        }
+
+        @media (max-width: 768px) {
+            .admin-tabs {
+                flex-direction: column;
+            }
+
+            .tab-button {
+                border-right: none;
+                border-bottom: 1px solid #e9ecef;
+            }
+
+            .tab-button:last-child {
+                border-bottom: none;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .grid-container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <!-- Header -->
+        <div class="admin-header">
+            <h1>🏆 Panel de Administración LPCP</h1>
+            <p>Sistema de gestión completo para la Liga Panameña de Clubes Pro</p>
+        </div>
+
+        <!-- Estadísticas generales -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number" id="totalTeams">0</div>
+                <div class="stat-label">Equipos</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="totalPlayers">0</div>
+                <div class="stat-label">Jugadores</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="totalClubs">0</div>
+                <div class="stat-label">Clubes</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="totalMatches">0</div>
+                <div class="stat-label">Partidos</div>
+            </div>
+        </div>
+
+        <!-- Tabs de navegación -->
+        <div class="admin-tabs">
+            <button class="tab-button active" onclick="switchTab('teams')">
+                ⚽ Equipos
+            </button>
+            <button class="tab-button" onclick="switchTab('players')">
+                👤 Jugadores
+            </button>
+            <button class="tab-button" onclick="switchTab('clubs')">
+                🏛️ Clubes
+            </button>
+            <button class="tab-button" onclick="switchTab('matches')">
+                🏆 Partidos
+            </button>
+            <button class="tab-button" onclick="switchTab('clips')">
+                🎬 Clips
+            </button>
+        </div>
+
+        <!-- Tab: Equipos -->
+        <div id="teams-tab" class="tab-content active">
+            <div class="section-header">
+                <h2 class="section-title">Gestión de Equipos</h2>
+                <button class="btn-primary" onclick="toggleForm('teamForm')">
+                    ➕ Nuevo Equipo
+                </button>
+            </div>
+
+            <!-- Formulario de equipos -->
+            <div id="teamFormContainer" class="form-container" style="display: none;">
+                <form id="teamForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="teamName">Nombre del Equipo *</label>
+                            <input type="text" id="teamName" name="name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="teamFounded">Año de Fundación</label>
+                            <input type="number" id="teamFounded" name="founded" min="1900" max="2025">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="teamStadium">Estadio</label>
+                            <input type="text" id="teamStadium" name="stadium">
+                        </div>
+                        <div class="form-group">
+                            <label for="teamLogo">URL del Logo</label>
+                            <input type="url" id="teamLogo" name="logo">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <button type="submit" class="btn-primary">Crear Equipo</button>
+                        <button type="button" class="btn-secondary" onclick="toggleForm('teamForm')">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Grid de equipos -->
+            <div id="teamsGrid" class="grid-container">
+                <!-- Los equipos se cargarán aquí dinámicamente -->
+            </div>
+        </div>
+
+        <!-- Tab: Jugadores -->
+        <div id="players-tab" class="tab-content">
+            <div class="section-header">
+                <h2 class="section-title">Gestión de Jugadores</h2>
+                <button class="btn-primary" onclick="toggleForm('playerForm')">
+                    ➕ Nuevo Jugador
+                </button>
+            </div>
+
+            <!-- Formulario de jugadores -->
+            <div id="playerFormContainer" class="form-container" style="display: none;">
+                <form id="playerForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="playerName">Nombre del Jugador *</label>
+                            <input type="text" id="playerName" name="name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="playerClub">Club *</label>
+                            <select id="playerClub" name="clubName" required>
+                                <option value="">Seleccionar club...</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="playerPosition">Posición</label>
+                            <select id="playerPosition" name="position">
+                                <option value="Jugador">Jugador</option>
+                                <option value="Portero">Portero</option>
+                                <option value="Defensa">Defensa</option>
+                                <option value="Mediocampista">Mediocampista</option>
+                                <option value="Delantero">Delantero</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="playerNumber">Número</label>
+                            <input type="number" id="playerNumber" name="number" min="1" max="99">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="playerAge">Edad</label>
+                            <input type="number" id="playerAge" name="age" min="16" max="45">
+                        </div>
+                        <div class="form-group">
+                            <label for="playerNationality">Nacionalidad</label>
+                            <input type="text" id="playerNationality" name="nationality" value="Panamá">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <button type="submit" class="btn-primary">Crear Jugador</button>
+                        <button type="button" class="btn-secondary" onclick="toggleForm('playerForm')">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Grid de jugadores -->
+            <div id="playersGrid" class="grid-container">
+                <!-- Los jugadores se cargarán aquí dinámicamente -->
+            </div>
+        </div>
+
+        <!-- Tab: Clubes -->
+        <div id="clubs-tab" class="tab-content">
+            <div class="section-header">
+                <h2 class="section-title">Gestión de Clubes</h2>
+            </div>
+
+            <!-- Grid de clubes -->
+            <div id="clubsGrid" class="grid-container">
+                <!-- Los clubes se cargarán aquí dinámicamente -->
+            </div>
+        </div>
+
+        <!-- Tab: Partidos -->
+        <div id="matches-tab" class="tab-content">
+            <div class="section-header">
+                <h2 class="section-title">Gestión de Partidos</h2>
+                <button class="btn-primary" onclick="toggleForm('matchForm')">
+                    ➕ Nuevo Partido
+                </button>
+            </div>
+
+            <!-- Grid de partidos -->
+            <div id="matchesGrid" class="grid-container">
+                <!-- Los partidos se cargarán aquí dinámicamente -->
+            </div>
+        </div>
+
+        <!-- Tab: Clips -->
+        <div id="clips-tab" class="tab-content">
+            <div class="section-header">
+                <h2 class="section-title">Gestión de Clips</h2>
+                <button class="btn-primary" onclick="toggleForm('clipForm')">
+                    ➕ Nuevo Clip
+                </button>
+            </div>
+
+            <!-- Grid de clips -->
+            <div id="clipsGrid" class="grid-container">
+                <!-- Los clips se cargarán aquí dinámicamente -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="admin-new.js"></script>
+    <script>
+        // Funciones auxiliares para la interfaz
+        function switchTab(tabName) {
+            // Ocultar todas las tabs
+            const tabs = document.querySelectorAll('.tab-content');
+            tabs.forEach(tab => tab.classList.remove('active'));
+            
+            // Desactivar todos los botones
+            const buttons = document.querySelectorAll('.tab-button');
+            buttons.forEach(btn => btn.classList.remove('active'));
+            
+            // Mostrar tab seleccionada
+            document.getElementById(tabName + '-tab').classList.add('active');
+            
+            // Activar botón correspondiente
+            event.target.classList.add('active');
+            
+            // Actualizar estadísticas
+            updateStats();
+        }
+
+        function toggleForm(formId) {
+            const container = document.getElementById(formId + 'Container');
+            if (container.style.display === 'none') {
+                container.style.display = 'block';
+                
+                // Llenar select de clubes si es el formulario de jugadores
+                if (formId === 'playerForm') {
+                    updateClubSelect();
+                }
+            } else {
+                container.style.display = 'none';
+            }
+        }
+
+        function updateClubSelect() {
+            const select = document.getElementById('playerClub');
+            if (!select || !window.adminSystem) return;
+            
+            // Limpiar opciones existentes
+            select.innerHTML = '<option value="">Seleccionar club...</option>';
+            
+            // Agregar clubes disponibles
+            window.adminSystem.teams.forEach(team => {
+                const option = document.createElement('option');
+                option.value = team.name;
+                option.textContent = team.name;
+                select.appendChild(option);
+            });
+        }
+
+        function updateStats() {
+            if (!window.adminSystem) return;
+            
+            document.getElementById('totalTeams').textContent = window.adminSystem.teams.length;
+            document.getElementById('totalPlayers').textContent = window.adminSystem.players.length;
+            document.getElementById('totalClubs').textContent = window.adminSystem.clubs.length;
+            document.getElementById('totalMatches').textContent = window.adminSystem.matches.length;
+        }
+
+        // Actualizar estadísticas cada 5 segundos
+        setInterval(updateStats, 5000);
+    </script>
+</body>
+</html>

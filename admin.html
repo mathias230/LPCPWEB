@@ -640,6 +640,16 @@
         <div class="admin-header">
             <h1><i class="fas fa-cog"></i> Panel de Administración</h1>
             <p>Gestiona equipos y partidos del torneo</p>
+            
+            <!-- Botón de Limpieza MongoDB -->
+            <div style="text-align: center; margin: 20px 0; padding: 15px; background: rgba(255, 0, 0, 0.1); border: 2px solid #ff4757; border-radius: 10px;">
+                <h3 style="color: #ff4757; margin-bottom: 10px;"><i class="fas fa-exclamation-triangle"></i> Limpieza de Base de Datos</h3>
+                <p style="color: rgba(255,255,255,0.8); margin-bottom: 15px; font-size: 14px;">Si aún ves equipos o clubes después de limpiar archivos locales, usa este botón para limpiar MongoDB Atlas</p>
+                <button onclick="cleanupMongoDB()" style="background: linear-gradient(45deg, #ff4757, #ff3742); color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 16px; transition: all 0.3s ease;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                    <i class="fas fa-broom"></i> Limpiar MongoDB Atlas
+                </button>
+                <div id="cleanupResult" style="margin-top: 10px; font-weight: 600;"></div>
+            </div>
         </div>
 
         <!-- Admin Tabs -->
@@ -700,7 +710,22 @@
             </form>
 
             <div class="teams-grid" id="teamsGrid">
-                <!-- Teams will be loaded here -->
+                <!-- Teams will be loaded here dynamically, but here are some examples -->
+                <div class="team-card">
+                    <div class="team-name">Equipo de Prueba</div>
+                    <p style="color: rgba(255,255,255,0.7);">ID: 1</p>
+                    <div style="margin-top: 15px;">
+                        <button onclick="editTeam(1)" style="background: linear-gradient(45deg, #3498db, #2980b9); color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; margin-right: 10px;">
+                            <i class="fas fa-edit"></i> Editar
+                        </button>
+                        <button onclick="deleteTeam(1)" style="background: linear-gradient(45deg, #e74c3c, #c0392b); color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer;">
+                            <i class="fas fa-trash"></i> Eliminar
+                        </button>
+                        <button onclick="alert('¡JavaScript SÍ funciona!')" style="background: linear-gradient(45deg, #f39c12, #e67e22); color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; margin-left: 10px;">
+                            <i class="fas fa-test"></i> Prueba
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -1088,6 +1113,7 @@
         window.logout = logout;
     </script>
     
+    <!-- Admin JavaScript -->
     <script src="admin.js"></script>
 </body>
 </html>
