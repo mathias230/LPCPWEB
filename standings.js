@@ -32,6 +32,8 @@ function setupWebSocket() {
     socket.on('matchesUpdate', (updatedMatches) => {
         console.log('⚽ Actualizando partidos...');
         fixturesData = updatedMatches;
+        
+        // Actualizar todas las pestañas que dependen de partidos
         if (document.querySelector('#fixtures.active')) {
             loadFixtures();
         }
@@ -41,6 +43,15 @@ function setupWebSocket() {
         if (document.querySelector('#schedule.active')) {
             loadSchedule();
         }
+        
+        // IMPORTANTE: También actualizar la tabla de posiciones
+        // ya que los partidos afectan las estadísticas de los equipos
+        console.log('📊 Recalculando tabla de posiciones tras actualización de partidos...');
+        loadStandingsData().then(() => {
+            if (document.querySelector('#table.active')) {
+                loadStandingsTable();
+            }
+        });
     });
     
     socket.on('teamsUpdate', (updatedTeams) => {
@@ -61,6 +72,27 @@ function setupWebSocket() {
         // Si estamos viendo la tabla, actualizarla inmediatamente
         if (document.querySelector('#table.active')) {
             loadStandingsTable();
+        }
+    });
+    
+    // Handler para actualizaciones de jugadores y estadísticas
+    socket.on('playersUpdate', (updatedPlayers) => {
+        console.log('🏃 Actualizando jugadores y estadísticas...');
+        
+        // Si estamos en la pestaña de estadísticas, recargar
+        if (document.querySelector('#stats.active')) {
+            console.log('📊 Recargando estadísticas tras actualización de jugadores...');
+            loadStats();
+        }
+    });
+    
+    socket.on('playerStatsChanged', (data) => {
+        console.log('⚽ Estadísticas de jugador actualizadas:', data);
+        
+        // Si estamos en la pestaña de estadísticas, recargar
+        if (document.querySelector('#stats.active')) {
+            console.log('📊 Recargando estadísticas tras cambio de stats...');
+            loadStats();
         }
     });
     
@@ -99,6 +131,79 @@ function setupWebSocket() {
             // Si no estamos en la pestaña de estadísticas, al menos actualizar el resumen
             updateStatsSummary(updatedPlayers);
         }
+    });
+    
+    // Handlers específicos para eventos individuales de partidos
+    socket.on('matchCreated', (newMatch) => {
+        console.log('⚽ Nuevo partido creado:', newMatch);
+        // Recargar datos de partidos y tabla de posiciones
+        loadMatchesData().then(() => {
+            // Actualizar pestañas activas
+            if (document.querySelector('#fixtures.active')) {
+                loadFixtures();
+            }
+            if (document.querySelector('#results.active')) {
+                loadResults();
+            }
+            if (document.querySelector('#schedule.active')) {
+                loadSchedule();
+            }
+        });
+        
+        // También actualizar tabla de posiciones
+        loadStandingsData().then(() => {
+            if (document.querySelector('#table.active')) {
+                loadStandingsTable();
+            }
+        });
+    });
+    
+    socket.on('matchUpdated', (updatedMatch) => {
+        console.log('⚽ Partido actualizado:', updatedMatch);
+        // Recargar datos de partidos y tabla de posiciones
+        loadMatchesData().then(() => {
+            // Actualizar pestañas activas
+            if (document.querySelector('#fixtures.active')) {
+                loadFixtures();
+            }
+            if (document.querySelector('#results.active')) {
+                loadResults();
+            }
+            if (document.querySelector('#schedule.active')) {
+                loadSchedule();
+            }
+        });
+        
+        // También actualizar tabla de posiciones
+        loadStandingsData().then(() => {
+            if (document.querySelector('#table.active')) {
+                loadStandingsTable();
+            }
+        });
+    });
+    
+    socket.on('matchDeleted', (data) => {
+        console.log('⚽ Partido eliminado:', data);
+        // Recargar datos de partidos y tabla de posiciones
+        loadMatchesData().then(() => {
+            // Actualizar pestañas activas
+            if (document.querySelector('#fixtures.active')) {
+                loadFixtures();
+            }
+            if (document.querySelector('#results.active')) {
+                loadResults();
+            }
+            if (document.querySelector('#schedule.active')) {
+                loadSchedule();
+            }
+        });
+        
+        // También actualizar tabla de posiciones
+        loadStandingsData().then(() => {
+            if (document.querySelector('#table.active')) {
+                loadStandingsTable();
+            }
+        });
     });
     
     socket.on('disconnect', () => {
@@ -565,7 +670,7 @@ async function loadTeamsData() {
 async function loadMatchesData() {
     try {
         console.log('⚽ Cargando datos de partidos...');
-        const response = await fetchWithTimeout('/api/tournament/matches', {}, 4000);
+        const response = await fetchWithTimeout('/api/matches', {}, 4000);
         
         if (!response.ok) {
             throw new Error(`Error ${response.status}: ${response.statusText}`);
@@ -624,12 +729,14 @@ function generateFallbackStandings() {
         return [];
     }
     
+    console.log('🔧 Generando standings con equipos:', teamsData.map(t => t.name));
+    
     // Solo usar equipos reales
     const fallbackTeams = teamsData;
     
-    return fallbackTeams.map((team, index) => ({
+    const standings = fallbackTeams.map((team, index) => ({
         position: index + 1,
-        team: team.name, // Solo guardamos el nombre del equipo, no el objeto completo
+        team: team.name || 'Equipo sin nombre', // Asegurar que siempre hay un nombre
         played: 0,       // Partidos jugados
         won: 0,          // Partidos ganados
         drawn: 0,        // Empates
@@ -639,6 +746,9 @@ function generateFallbackStandings() {
         goalDifference: 0,// Diferencia de goles
         points: 0        // Puntos
     })).sort((a, b) => b.points - a.points).map((team, index) => ({ ...team, position: index + 1 }));
+    
+    console.log('✅ Standings generados:', standings.map(s => `${s.position}. ${s.team}`));
+    return standings;
 }
 
 // Generate sample fixtures for demonstration - Updated for 3 matchdays with 6 matches each
@@ -650,7 +760,7 @@ function generateSampleFixtures() {
         return Math.floor((x - Math.floor(x)) * (max - min + 1)) + min;
     };
     
-    const teamNames = teams.map(team => team.name);
+    const teamNames = teamsData.map(team => team.name);
     const fixtures = [];
     const today = new Date();
     
@@ -735,7 +845,7 @@ function generateSampleFixtures() {
 }
 
 // Load and display standings table - FIXED VERSION
-function loadStandingsTable() {
+async function loadStandingsTable() {
     console.log('🔄 Loading standings table...');
     console.log('🔍 DEBUG: teamsData:', teamsData);
     console.log('🔍 DEBUG: teamsData.length:', teamsData ? teamsData.length : 'undefined');
@@ -744,8 +854,34 @@ function loadStandingsTable() {
     
     const tableBody = document.getElementById('standingsTableBody');
     if (!tableBody) {
-        console.warn('No se encontró el elemento de la tabla de posiciones');
+        console.error('❌ No se encontró standingsTableBody');
         return;
+    }
+    
+    // 🎨 CARGAR ZONAS DE CLASIFICACIÓN ANTES DE RENDERIZAR LA TABLA
+    let currentZones = [];
+    try {
+        console.log('🎨 Cargando zonas de clasificación desde MongoDB...');
+        const zonesResponse = await fetch('/api/settings/classification-zones');
+        if (zonesResponse.ok) {
+            const zonesData = await zonesResponse.json();
+            if (zonesData.success && zonesData.classificationZones) {
+                currentZones = zonesData.classificationZones;
+                console.log('✅ Zonas cargadas desde MongoDB:', currentZones.length);
+            }
+        }
+    } catch (error) {
+        console.error('❌ Error cargando zonas:', error);
+    }
+    
+    // Si no se pudieron cargar zonas desde MongoDB, usar las por defecto
+    if (currentZones.length === 0) {
+        currentZones = [
+            { id: 1, name: 'Clasificación Directa', positions: '1-4', color: '#00ff88' },
+            { id: 2, name: 'Repechaje', positions: '5-8', color: '#ffa500' },
+            { id: 3, name: 'Eliminación', positions: '9-12', color: '#ff4757' }
+        ];
+        console.log('📋 Usando zonas por defecto como fallback');
     }
     
     // Verificar si hay equipos reales en el sistema
@@ -783,21 +919,28 @@ function loadStandingsTable() {
         console.log(`✅ Generados datos base para ${standingsData.length} equipos`);
     }
     
-    // Aplicar estilos dinámicos para las zonas de clasificación
-    applyDynamicZoneStyles();
+    // Aplicar estilos dinámicos para las zonas de clasificación - USAR ZONAS DE MONGODB
+    applyDynamicZoneStyles(currentZones);
     
     // Ordenar los datos por posición
     const sortedStandings = [...standingsData].sort((a, b) => a.position - b.position);
     
     tableBody.innerHTML = sortedStandings.map(teamData => {
+        // Debug: mostrar datos del equipo
+        console.log('🔍 Procesando equipo:', teamData);
+        
         // Asegurarse de que teamData.team sea un string y no un objeto
-        const teamName = typeof teamData.team === 'object' ? teamData.team.name : teamData.team;
+        // Los datos pueden venir como 'team' o 'teamName' dependiendo del endpoint
+        const teamName = teamData.teamName || teamData.team || (typeof teamData.team === 'object' ? teamData.team.name : teamData.team);
+        console.log('🔍 Nombre del equipo extraído:', teamName);
         
         // Encontrar el equipo en los datos dinámicos para obtener el logo
         const teamInfo = teamsData.find(t => t.name === teamName) || { 
-            name: teamName, 
+            name: teamName || 'Equipo desconocido', 
             logo: 'img/default-team.png' 
         };
+        
+        console.log('🔍 Info del equipo encontrada:', teamInfo);
         
         // Si el logo no se encuentra, usar una imagen por defecto
         const logoPath = teamInfo.logo || 'img/default-team.png';
@@ -825,15 +968,30 @@ function loadStandingsTable() {
         `;
     }).join('');
     
+    // 🎨 APLICAR COLORES DE ZONAS DE CLASIFICACIÓN INMEDIATAMENTE
+    setTimeout(() => {
+        applyClassificationColors(currentZones);
+        renderClassificationLegend(currentZones);
+        console.log('🎨 Colores de zonas aplicados:', currentZones.length, 'zonas');
+    }, 100);
+    
     console.log('✅ Tabla de posiciones cargada con', standingsData.length, 'equipos');
 }
 
-// Aplicar estilos dinámicos para las zonas de clasificación
-function applyDynamicZoneStyles() {
+// Aplicar estilos dinámicos para las zonas de clasificación - FIXED VERSION
+function applyDynamicZoneStyles(zones) {
     // Remover estilos existentes
     const existingStyle = document.getElementById('dynamic-zone-styles');
     if (existingStyle) {
         existingStyle.remove();
+    }
+    
+    // Usar las zonas pasadas como parámetro, no la variable global
+    const zonesToUse = zones || [];
+    
+    if (zonesToUse.length === 0) {
+        console.warn('⚠️ No hay zonas para aplicar estilos');
+        return;
     }
     
     // Crear nuevos estilos basados en las zonas de clasificación
@@ -841,7 +999,7 @@ function applyDynamicZoneStyles() {
     style.id = 'dynamic-zone-styles';
     
     let css = '';
-    classificationZones.forEach(zone => {
+    zonesToUse.forEach(zone => {
         css += `
             .zone-${zone.id} {
                 border-left: 4px solid ${zone.color} !important;
@@ -856,22 +1014,30 @@ function applyDynamicZoneStyles() {
     style.textContent = css;
     document.head.appendChild(style);
     
-    console.log('🎨 Estilos dinámicos aplicados para', classificationZones.length, 'zonas');
+    console.log('🎨 Estilos dinámicos aplicados para', zonesToUse.length, 'zonas desde MongoDB');
     
-    // También actualizar la leyenda
-    updateTableLegend();
+    // También actualizar la leyenda con las zonas correctas
+    updateTableLegend(zonesToUse);
 }
 
-// Actualizar la leyenda de colores debajo de la tabla
-function updateTableLegend() {
+// Actualizar la leyenda de colores debajo de la tabla - FIXED VERSION
+function updateTableLegend(zones) {
     const legendContainer = document.querySelector('.table-legend');
     if (!legendContainer) return;
+    
+    // Usar las zonas pasadas como parámetro, no la variable global
+    const zonesToUse = zones || [];
+    
+    if (zonesToUse.length === 0) {
+        console.warn('⚠️ No hay zonas para actualizar leyenda');
+        return;
+    }
     
     // Limpiar leyenda existente
     legendContainer.innerHTML = '';
     
     // Crear elementos de leyenda basados en las zonas de clasificación
-    classificationZones.forEach(zone => {
+    zonesToUse.forEach(zone => {
         const legendItem = document.createElement('div');
         legendItem.className = 'legend-item';
         
@@ -942,9 +1108,21 @@ function loadFixtures() {
     const maxJornadas = getMaxMatchdays();
     
     // Get current matchday fixtures (up to 6 matches)
+    console.log('🔍 DEBUG FIXTURES: currentMatchday =', currentMatchday);
+    console.log('🔍 DEBUG FIXTURES: fixturesData =', fixturesData);
+    console.log('🔍 DEBUG FIXTURES: primer partido =', fixturesData[0]);
+    
     const matchdayFixtures = fixturesData
-        .filter(match => match.matchday === currentMatchday)
+        .filter(match => {
+            console.log('🔍 FILTRO: match.matchday =', match.matchday, 'vs currentMatchday =', currentMatchday);
+            // Si matchday es undefined, asumimos que es jornada 1
+            const matchMatchday = match.matchday || 1;
+            return matchMatchday === currentMatchday;
+        })
         .slice(0, 6); // Ensure we only show 6 matches per matchday
+        
+    console.log('🔍 DEBUG FIXTURES: matchdayFixtures filtrados =', matchdayFixtures);
+    console.log('🔍 DEBUG FIXTURES: cantidad filtrada =', matchdayFixtures.length);
     
     // Create matchday navigation controls
     const navigationHTML = `
@@ -1004,7 +1182,13 @@ function loadResults() {
     // Actualizar número máximo de jornadas dinámicamente
     const maxJornadas = getMaxMatchdays();
     
-    const matchdayResults = resultsData.filter(match => match.matchday === currentMatchday);
+    // Filtrar partidos terminados de la jornada actual desde fixturesData
+    const matchdayResults = fixturesData.filter(match => {
+        // Si matchday es undefined, asumimos que es jornada 1
+        const matchMatchday = match.matchday || 1;
+        // Solo mostrar partidos terminados en la pestaña de resultados
+        return matchMatchday === currentMatchday && match.status === 'finished';
+    });
     
     // Create matchday navigation controls for results
     if (resultsContainer) {
@@ -2154,3 +2338,227 @@ function loadStats() {
         loadMainStatistics();
     }
 }
+
+// ==================== ZONAS DE CLASIFICACIÓN ====================
+
+// Función para cargar zonas de clasificación desde el backend
+async function loadClassificationZones() {
+    try {
+        console.log('🎨 Cargando zonas de clasificación...');
+        
+        const response = await fetch('/api/settings/classification-zones');
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.success && data.classificationZones) {
+            console.log('✅ Zonas de clasificación cargadas:', data.classificationZones.length);
+            // NO renderizar leyenda aquí - se hará en applyClassificationColors
+            return data.classificationZones;
+        } else {
+            throw new Error(data.error || 'Error desconocido');
+        }
+        
+    } catch (error) {
+        console.error('❌ Error cargando zonas de clasificación:', error);
+        
+        // Usar zonas por defecto
+        const defaultZones = [
+            { id: 1, name: 'Clasificación Directa', positions: '1-4', color: '#00ff88' },
+            { id: 2, name: 'Repechaje', positions: '5-8', color: '#ffa500' },
+            { id: 3, name: 'Eliminación', positions: '9-12', color: '#ff4757' }
+        ];
+        
+        console.log('📋 Usando zonas de clasificación por defecto');
+        // NO renderizar leyenda aquí - se hará en applyClassificationColors
+        return defaultZones;
+    }
+}
+
+// Variable para evitar renderizados múltiples de leyenda
+let isRenderingLegend = false;
+
+// Función para renderizar la leyenda de zonas de clasificación
+function renderClassificationLegend(zones) {
+    // Evitar renderizados múltiples simultáneos
+    if (isRenderingLegend) {
+        console.log('⚠️ Renderizado de leyenda ya en progreso, saltando...');
+        return;
+    }
+    
+    isRenderingLegend = true;
+    
+    const legendContainer = document.getElementById('classificationLegend');
+    if (!legendContainer) {
+        console.error('❌ No se encontró el contenedor classificationLegend');
+        isRenderingLegend = false;
+        return;
+    }
+    
+    // Validar que hay zonas para renderizar
+    if (!zones || zones.length === 0) {
+        console.warn('⚠️ No hay zonas para renderizar en la leyenda');
+        legendContainer.innerHTML = '';
+        isRenderingLegend = false;
+        return;
+    }
+    
+    // Limpiar contenido existente
+    legendContainer.innerHTML = '';
+    
+    // Crear elementos de leyenda
+    zones.forEach(zone => {
+        const legendItem = document.createElement('div');
+        legendItem.className = 'legend-item';
+        legendItem.style.cssText = `
+            display: flex;
+            align-items: center;
+            margin: 8px 15px;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.9);
+        `;
+        
+        const colorBox = document.createElement('span');
+        colorBox.className = 'legend-color';
+        colorBox.style.cssText = `
+            width: 16px;
+            height: 16px;
+            background-color: ${zone.color};
+            border-radius: 3px;
+            margin-right: 10px;
+            display: inline-block;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        `;
+        
+        const labelText = document.createElement('span');
+        labelText.textContent = `${zone.name} (${zone.positions})`;
+        labelText.style.cssText = `
+            font-weight: 500;
+            letter-spacing: 0.5px;
+        `;
+        
+        legendItem.appendChild(colorBox);
+        legendItem.appendChild(labelText);
+        legendContainer.appendChild(legendItem);
+    });
+    
+    console.log('✅ Leyenda de clasificación renderizada:', zones.length, 'zonas');
+    
+    // Liberar la protección de renderizado múltiple
+    isRenderingLegend = false;
+}
+
+// Función para aplicar colores a las filas de la tabla de posiciones
+function applyClassificationColors(zones) {
+    console.log('🔍 DEPURACIÓN: applyClassificationColors llamada con:', zones);
+    console.log('🔍 DEPURACIÓN: Número de zonas recibidas:', zones ? zones.length : 'undefined');
+    
+    if (zones) {
+        zones.forEach((zone, idx) => {
+            console.log(`🔍 DEPURACIÓN: Zona ${idx + 1}:`, {
+                id: zone.id,
+                name: zone.name,
+                positions: zone.positions,
+                color: zone.color
+            });
+        });
+    }
+    
+    const tableRows = document.querySelectorAll('#standingsTableBody tr');
+    console.log('🔍 DEPURACIÓN: Filas de tabla encontradas:', tableRows.length);
+    
+    tableRows.forEach((row, index) => {
+        const position = index + 1;
+        console.log(`🔍 DEPURACIÓN: Procesando posición ${position}...`);
+        
+        // Encontrar la zona correspondiente a esta posición
+        const zone = zones.find(z => {
+            // Usar la misma lógica que isPositionInZone() para consistencia
+            if (!z.positions) return false;
+            
+            // Manejar rangos como "1-4" o posiciones individuales como "1"
+            if (z.positions.includes('-')) {
+                const [start, end] = z.positions.split('-').map(num => parseInt(num.trim()));
+                return position >= start && position <= end;
+            } else {
+                return position === parseInt(z.positions.trim());
+            }
+        });
+        
+        console.log(`🔍 DEPURACIÓN: Zona encontrada para posición ${position}:`, zone);
+        
+        if (zone) {
+            console.log(`🎨 APLICANDO COLOR: Posición ${position} -> ${zone.color} (${zone.name})`);
+            // Aplicar color de fondo sutil con !important via setProperty
+            row.style.setProperty('background-color', `${zone.color}15`, 'important');
+            row.style.setProperty('border-left', `3px solid ${zone.color}`, 'important');
+            // Remover cualquier clase CSS conflictiva
+            row.className = row.className.replace(/zone-\d+/g, '');
+        } else {
+            console.log(`⚪ LIMPIANDO: Posición ${position} sin zona`);
+            // Limpiar estilos si no hay zona con !important
+            row.style.setProperty('background-color', 'transparent', 'important');
+            row.style.setProperty('border-left', 'none', 'important');
+            // Remover cualquier clase CSS conflictiva
+            row.className = row.className.replace(/zone-\d+/g, '');
+        }
+    });
+    
+    // Renderizar leyenda UNA SOLA VEZ después de aplicar colores
+    renderClassificationLegend(zones);
+}
+
+// Función para aplicar zonas de clasificación después de cargar la tabla
+async function applyClassificationZonesAfterLoad() {
+    try {
+        console.log('🎨 Aplicando zonas de clasificación a la tabla...');
+        
+        const zones = await loadClassificationZones();
+        
+        // Aplicar colores a la tabla después de un pequeño delay
+        setTimeout(() => {
+            applyClassificationColors(zones);
+        }, 300);
+        
+    } catch (error) {
+        console.error('❌ Error aplicando zonas de clasificación:', error);
+    }
+}
+
+// Hook para integrar zonas de clasificación con la tabla existente
+function integrateClassificationZones() {
+    // Buscar la función original loadStandingsTable y extenderla
+    const originalFunction = window.loadStandingsTable || loadStandingsTable;
+    
+    if (typeof originalFunction === 'function') {
+        // Crear nueva versión que incluye zonas de clasificación
+        window.loadStandingsTable = function() {
+            // Ejecutar función original
+            const result = originalFunction.apply(this, arguments);
+            
+            // Aplicar zonas de clasificación después de cargar la tabla
+            setTimeout(() => {
+                applyClassificationZonesAfterLoad();
+            }, 100);
+            
+            return result;
+        };
+        
+        console.log('✅ Zonas de clasificación integradas con loadStandingsTable');
+    } else {
+        console.warn('⚠️ No se pudo encontrar loadStandingsTable para integrar zonas');
+    }
+}
+
+// Inicializar zonas de clasificación cuando se carga la página
+document.addEventListener('DOMContentLoaded', () => {
+    // Integrar zonas con la tabla existente
+    setTimeout(() => {
+        integrateClassificationZones();
+        // Cargar leyenda inicial
+        loadClassificationZones();
+    }, 500);
+});

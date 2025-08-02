@@ -7,6 +7,11 @@ document.addEventListener('DOMContentLoaded', function() {
     loadInitialData();
     initializeWebSocket(); // Inicializar WebSocket para sincronización
     
+    // Poblar selectores de equipos para formulario de partidos
+    setTimeout(() => {
+        populateTeamSelects();
+    }, 1000); // Esperar 1 segundo para que se carguen los equipos
+    
     console.log(' Panel de administración inicializado');
 });
 
@@ -42,68 +47,111 @@ window.cancelTeamEdit = function() {
     document.getElementById('cancelTeamBtn').style.display = 'none';
 };
 
-window.deleteTeam = async function(teamId) {
-    console.log('🗑️ Intentando eliminar equipo ID:', teamId);
+window.deleteTeam = async function(teamId, event) {
+    console.group('🗑️ [DELETE TEAM] Iniciando eliminación de equipo...');
+    console.log('🔍 [DELETE TEAM] ID recibido:', teamId);
+    console.log('🔍 [DELETE TEAM] Tipo de ID:', typeof teamId);
+    console.log('🔍 [DELETE TEAM] Evento:', event);
     
-    const team = teams.find(t => t.id == teamId || t.id === parseInt(teamId));
-    if (!team) {
-        console.error('❌ Equipo no encontrado con ID:', teamId);
-        alert('Error: Equipo no encontrado');
+    // Si no se proporcionó teamId, intentar obtenerlo del botón que disparó el evento
+    if ((!teamId || teamId === 'undefined') && event) {
+        const button = event.target.closest('button');
+        if (button) {
+            teamId = button.getAttribute('data-team-id');
+            console.log('🔍 [DELETE TEAM] ID obtenido del botón:', teamId);
+        }
+    }
+    
+    // Verificar que teamId no sea undefined o vacío
+    if (!teamId && teamId !== 0) {
+        const errorMsg = '❌ [DELETE TEAM] Error: No se pudo obtener un ID de equipo válido';
+        console.error(errorMsg);
+        console.log('🔍 [DELETE TEAM] Equipos disponibles:', teams);
+        alert('Error: No se pudo identificar el equipo a eliminar. Por favor, recarga la página e intenta de nuevo.');
+        console.groupEnd();
         return;
     }
+    
+    // Buscar el equipo en el array local
+    const team = teams.find(t => t.id == teamId || t._id == teamId || t.id === teamId || t._id === teamId);
+    
+    if (!team) {
+        const errorMsg = `❌ [DELETE TEAM] No se encontró ningún equipo con el ID: ${teamId}`;
+        console.error(errorMsg);
+        console.log('🔍 [DELETE TEAM] Equipos disponibles:', teams);
+        alert('Error: Equipo no encontrado. Por favor, recarga la página e intenta de nuevo.');
+        return;
+    }
+    
+    console.log('🔍 [DELETE TEAM] Equipo encontrado:', team.name, '(ID:', team.id || team._id, ')');
     
     const confirmed = confirm(`¿Estás seguro de que quieres eliminar el equipo "${team.name}"?\n\nEsto también eliminará:\n- Todos los jugadores del equipo\n- El club asociado\n- Los partidos relacionados`);
     
     if (!confirmed) {
-        console.log('❌ Eliminación cancelada por el usuario');
+        console.log('❌ [DELETE TEAM] Eliminación cancelada por el usuario');
         return;
     }
     
     try {
-        console.log('🔄 Enviando solicitud DELETE al servidor...');
+        // Usar el ID correcto (puede ser _id o id)
+        const actualTeamId = team._id || team.id;
+        console.log('🔄 [DELETE TEAM] Enviando solicitud DELETE a:', `/api/teams/${actualTeamId}`);
         
-        const response = await fetch(`/api/teams/${teamId}`, {
+        const response = await fetch(`/api/teams/${actualTeamId}`, {
             method: 'DELETE',
             headers: {
                 'Content-Type': 'application/json'
             }
         });
         
-        console.log('📡 Respuesta del servidor:', response.status, response.statusText);
+        console.log('📡 [DELETE TEAM] Respuesta del servidor:', response.status, response.statusText);
         
         if (response.ok) {
             const result = await response.json();
-            console.log('✅ Equipo eliminado exitosamente:', result);
+            console.log('✅ [DELETE TEAM] Equipo eliminado exitosamente:', result);
             
             // Mostrar notificación de éxito
+            const successMsg = `Equipo "${team.name}" eliminado exitosamente`;
             if (typeof showNotification === 'function') {
-                showNotification(`Equipo "${team.name}" eliminado exitosamente`, 'success');
+                showNotification(successMsg, 'success');
             } else {
-                alert(`✅ Equipo "${team.name}" eliminado exitosamente`);
+                alert(`✅ ${successMsg}`);
             }
             
             // Recargar datos
+            console.log('🔄 [DELETE TEAM] Recargando datos...');
             await loadTeams();
             await loadClubs();
             await loadPlayers();
             
         } else {
-            const error = await response.json();
-            console.error('❌ Error del servidor:', error);
+            let errorMsg;
+            try {
+                const errorData = await response.json();
+                console.error('❌ [DELETE TEAM] Error del servidor:', errorData);
+                errorMsg = errorData.error || `Error ${response.status}: ${response.statusText}`;
+            } catch (e) {
+                errorMsg = `Error ${response.status}: ${response.statusText}`;
+                console.error('❌ [DELETE TEAM] No se pudo analizar la respuesta de error:', e);
+            }
+            
+            const fullErrorMsg = `Error eliminando equipo: ${errorMsg}`;
+            console.error('❌ [DELETE TEAM]', fullErrorMsg);
             
             if (typeof showNotification === 'function') {
-                showNotification(error.error || 'Error eliminando equipo', 'error');
+                showNotification(fullErrorMsg, 'error');
             } else {
-                alert(`❌ Error: ${error.error || 'Error eliminando equipo'}`);
+                alert(`❌ ${fullErrorMsg}`);
             }
         }
     } catch (error) {
-        console.error('❌ Error de conexión:', error);
+        const errorMsg = 'Error de conexión con el servidor';
+        console.error(`❌ [DELETE TEAM] ${errorMsg}:`, error);
         
         if (typeof showNotification === 'function') {
-            showNotification('Error de conexión con el servidor', 'error');
+            showNotification(errorMsg, 'error');
         } else {
-            alert(' Error de conexión con el servidor');
+            alert(`❌ ${errorMsg}: ${error.message}`);
         }
     }
 };
@@ -130,43 +178,160 @@ function initializeWebSocket() {
         
         // Handler para actualizaciones de clubes
         socket.on('clubsUpdate', (updatedClubs) => {
-            console.log('🏢 Actualización de clubes recibida:', updatedClubs.length);
-            clubs = updatedClubs;
-            if (currentTab === 'clubs') {
-                renderClubs();
+            console.log('🏢 Actualización de clubes recibida:', updatedClubs?.length || 0);
+            if (updatedClubs) {
+                clubs = updatedClubs;
+                if (currentTab === 'clubs') {
+                    renderClubs();
+                }
             }
         });
         
         // Handler para actualizaciones de equipos
         socket.on('teamsUpdate', (updatedTeams) => {
-            console.log('🏆 Actualización de equipos recibida:', updatedTeams.length);
+            console.log(' Equipos actualizados vía WebSocket:', updatedTeams.length);
             teams = updatedTeams;
-            if (currentTab === 'teams') {
-                renderTeams();
-            }
+            
+            // Actualizar vista de equipos automáticamente
+            forceRenderTeams();
+            
+            // Actualizar selectores de equipos en partidos
             populateTeamSelects();
+            
+            // Actualizar pestañas de equipos en jugadores
+            loadTeamTabs();
+            
+            showNotification('Equipos actualizados', 'success');
+        });
+        
+        socket.on('teamCreated', (newTeam) => {
+            console.log(' Nuevo equipo creado:', newTeam.name);
+            teams.push(newTeam);
+            forceRenderTeams();
+            populateTeamSelects();
+            loadTeamTabs();
+            showNotification(`Equipo "${newTeam.name}" creado`, 'success');
+        });
+        
+        socket.on('teamDeleted', (deletedTeamId) => {
+            console.log(' Equipo eliminado:', deletedTeamId);
+            teams = teams.filter(t => t._id !== deletedTeamId && t.id !== deletedTeamId);
+            forceRenderTeams();
+            populateTeamSelects();
+            loadTeamTabs();
+            showNotification('Equipo eliminado', 'success');
+        });
+        
+        // Handler para actualizaciones de clubes
+        socket.on('clubsUpdate', (updatedClubs) => {
+            console.log(' Clubes actualizados vía WebSocket:', updatedClubs.length);
+            clubs = updatedClubs;
+            renderClubs();
+            showNotification('Clubes actualizados', 'success');
+        });
+        
+        socket.on('clubCreated', (newClub) => {
+            console.log(' Nuevo club creado:', newClub.name);
+            clubs.push(newClub);
+            renderClubs();
+            showNotification(`Club "${newClub.name}" creado`, 'success');
+        });
+        
+        socket.on('clubDeleted', (deletedClubId) => {
+            console.log(' Club eliminado:', deletedClubId);
+            clubs = clubs.filter(c => c._id !== deletedClubId && c.id !== deletedClubId);
+            renderClubs();
+            showNotification('Club eliminado', 'success');
+        });
+        
+        // Handler para actualizaciones de brackets de playoffs
+        socket.on('bracketUpdated', (updatedBracket) => {
+            console.log('🏆 Bracket actualizado vía WebSocket:', updatedBracket);
+            if (currentTab === 'playoffs' && updatedBracket) {
+                currentBracket = updatedBracket;
+                renderBracket(updatedBracket);
+                showNotification('Bracket actualizado automáticamente', 'success');
+            }
+        });
+        
+        socket.on('playoffMatchUpdated', (matchData) => {
+            console.log('🎯 Partido de playoff actualizado:', matchData);
+            if (currentTab === 'playoffs') {
+                showNotification(`Partido actualizado: ${matchData.winner} ganó`, 'success');
+            }
         });
         
         // Handler para actualizaciones de jugadores
         socket.on('playersUpdate', (updatedPlayers) => {
-            console.log('🏃 Actualización de jugadores recibida:', updatedPlayers.length);
+            console.log('🏅 Jugadores actualizados vía WebSocket:', updatedPlayers.length);
             players = updatedPlayers;
-            if (currentTab === 'players' && selectedTeamId) {
+            
+            // Actualizar la vista si estamos en la pestaña de jugadores
+            const selectedTeamId = document.querySelector('.team-tab.active')?.getAttribute('data-team-id');
+            if (selectedTeamId) {
                 loadTeamPlayers(selectedTeamId);
             }
         });
         
+        socket.on('playerCreated', (newPlayer) => {
+            console.log(' Nuevo jugador creado:', newPlayer.name);
+            // NO agregar manualmente - ya se actualiza con playersUpdate
+            
+            // Actualizar vista si estamos viendo el equipo del jugador
+            const selectedTeamId = document.querySelector('.team-tab.active')?.getAttribute('data-team-id');
+            if (selectedTeamId === newPlayer.team._id || selectedTeamId === newPlayer.team) {
+                setTimeout(() => loadTeamPlayers(selectedTeamId), 100); // Pequeño delay para asegurar que playersUpdate se procese primero
+            }
+            
+            showNotification(`Jugador "${newPlayer.name}" creado`, 'success');
+        });
+        
+        socket.on('playerDeleted', (deletedPlayerId) => {
+            console.log(' Jugador eliminado:', deletedPlayerId);
+            players = players.filter(p => p._id !== deletedPlayerId && p.id !== deletedPlayerId);
+            
+            // Actualizar vista actual
+            const selectedTeamId = document.querySelector('.team-tab.active')?.getAttribute('data-team-id');
+            if (selectedTeamId) {
+                loadTeamPlayers(selectedTeamId);
+            }
+            
+            showNotification('Jugador eliminado', 'success');
+        });
+        
         // Handler para cambios específicos de estadísticas
         socket.on('playerStatsChanged', (data) => {
-            console.log(`📊 Estadística actualizada: ${data.playerName} - ${data.statType}: ${data.value}`);
+            console.log(` Estadística actualizada: ${data.playerName} - ${data.statType}: ${data.value}`);
             showNotification(`${data.playerName}: ${data.statType === 'goals' ? 'Goles' : 'Asistencias'} actualizado a ${data.value}`, 'success');
         });
         
-        socket.on('disconnect', () => {
-            console.log('❌ Admin desconectado del servidor WebSocket');
+        // Handler para actualizaciones de partidos
+        socket.on('matchesUpdate', (updatedMatches) => {
+            console.log(' Partidos actualizados vía WebSocket:', updatedMatches.length);
+            matches = updatedMatches;
+            renderMatches();
+            showNotification('Partidos actualizados', 'success');
         });
         
-        // Hacer socket disponible globalmente para updatePlayerStats
+        socket.on('matchCreated', (newMatch) => {
+            console.log(' Nuevo partido creado:', `${newMatch.homeTeam} vs ${newMatch.awayTeam}`);
+            matches.push(newMatch);
+            renderMatches();
+            showNotification(`Partido "${newMatch.homeTeam} vs ${newMatch.awayTeam}" creado`, 'success');
+        });
+        
+        socket.on('matchDeleted', (deletedMatchId) => {
+            console.log(' Partido eliminado:', deletedMatchId);
+            matches = matches.filter(m => m._id !== deletedMatchId && m.id !== deletedMatchId);
+            renderMatches();
+            showNotification('Partido eliminado', 'success');
+        });
+        
+        socket.on('disconnect', () => {
+            console.log(' Admin desconectado del servidor WebSocket');
+        });
+        
+        // Hacer socket disponible globalmente
         window.socket = socket;
     }
 }
@@ -334,10 +499,17 @@ function renderTeams() {
     // Crear HTML directamente como string (más simple)
     let html = '';
     teams.forEach((team, index) => {
-        console.log(`🏆 RENDERTEAMS: Procesando equipo ${index + 1}:`, team.name);
+        console.log(`🏆 RENDERTEAMS: Procesando equipo ${index + 1}:`, team);
+        
+        // Asegurarse de que el equipo tenga un ID
+        const teamId = team._id || team.id;
+        if (!teamId) {
+            console.error(`❌ RENDERTEAMS: El equipo "${team.name}" no tiene ID válido`, team);
+            return; // Saltar este equipo si no tiene ID
+        }
         
         html += `
-            <div style="
+            <div class="team-card" data-team-id="${teamId}" style="
                 background: rgba(255, 255, 255, 0.05);
                 border: 2px solid rgba(0, 255, 136, 0.2);
                 border-radius: 12px;
@@ -355,12 +527,13 @@ function renderTeams() {
                 </div>
                 <div style="flex: 1;">
                     <h3 style="color: #00ff88; margin: 0; font-size: 18px;">${team.name}</h3>
+                    <small style="color: rgba(255,255,255,0.5);">ID: ${teamId}</small>
                 </div>
                 <div style="display: flex; gap: 10px;">
-                    <button onclick="window.editTeam(${team.id})" style="background: linear-gradient(45deg, #3498db, #2980b9); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px;">
+                    <button onclick="window.editTeam('${teamId}')" class="btn-edit">
                         <i class="fas fa-edit"></i> Editar
                     </button>
-                    <button onclick="window.deleteTeam(${team.id})" style="background: linear-gradient(45deg, #e74c3c, #c0392b); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px;">
+                    <button onclick="window.deleteTeam('${teamId}', event)" class="btn-delete" data-team-id="${teamId}">
                         <i class="fas fa-trash"></i> Eliminar
                     </button>
                 </div>
@@ -444,75 +617,47 @@ function cancelTeamEdit() {
     document.getElementById('cancelTeamBtn').style.display = 'none';
 }
 
-// Función para eliminar equipo
-async function deleteTeam(teamId) {
-    const team = teams.find(t => t.id === teamId);
-    if (!team) return;
-    
-    if (!confirm(`¿Estás seguro de que quieres eliminar el equipo "${team.name}"?`)) {
-        return;
-    }
-    
-    try {
-        const response = await fetch(`/api/teams/${teamId}`, {
-            method: 'DELETE'
-        });
-        
-        if (response.ok) {
-            showNotification(`Equipo "${team.name}" eliminado exitosamente`, 'success');
-            await loadTeams(); // Recargar lista
-        } else {
-            const error = await response.json();
-            showNotification(error.error || 'Error eliminando equipo', 'error');
-        }
-    } catch (error) {
-        console.error('Error deleting team:', error);
-        showNotification('Error de conexión', 'error');
-    }
-}
-
-async function deleteTeam(teamId) {
-    const team = teams.find(t => t.id === teamId);
-    if (!team) return;
-    
-    if (!confirm(`¿Estás seguro de que quieres eliminar el equipo "${team.name}"?\n\nEsto también eliminará todos los jugadores del equipo.`)) {
-        return;
-    }
-    
-    try {
-        const response = await fetch(`/api/teams/${teamId}`, {
-            method: 'DELETE'
-        });
-        
-        if (response.ok) {
-            showNotification('Equipo eliminado exitosamente', 'success');
-            await loadTeams();
-        } else {
-            const error = await response.json();
-            showNotification(error.error || 'Error eliminando equipo', 'error');
-        }
-    } catch (error) {
-        console.error('Error deleting team:', error);
-        showNotification('Error de conexión', 'error');
-    }
-}
+// Las funciones deleteTeam duplicadas han sido eliminadas
+// La función window.deleteTeam ya está definida al inicio del archivo
 
 async function handleTeamSubmit(e) {
     e.preventDefault();
     
-    const formData = new FormData(e.target);
-    const teamId = formData.get('teamId');
+    const originalFormData = new FormData(e.target);
+    const teamId = originalFormData.get('teamId');
     
     // Validar datos
-    const teamName = formData.get('teamName').trim();
+    const teamName = originalFormData.get('teamName')?.trim();
     if (!teamName) {
         showNotification('El nombre del equipo es requerido', 'error');
         return;
     }
     
+    // Crear nuevo FormData con los campos correctos para el backend
+    const formData = new FormData();
+    formData.append('name', teamName); // Backend espera 'name', no 'teamName'
+    
+    // Agregar logo si existe
+    const logoFile = originalFormData.get('teamLogo');
+    if (logoFile && logoFile.size > 0) {
+        formData.append('logo', logoFile); // Backend espera 'logo', no 'teamLogo'
+    }
+    
+    // Agregar teamId si existe (para edición)
+    if (teamId) {
+        formData.append('teamId', teamId);
+    }
+    
     try {
         const url = teamId ? `/api/teams/${teamId}` : '/api/teams';
         const method = teamId ? 'PUT' : 'POST';
+        
+        console.log('🚀 Enviando equipo:', {
+            name: teamName,
+            hasLogo: logoFile && logoFile.size > 0,
+            method: method,
+            url: url
+        });
         
         const response = await fetch(url, {
             method: method,
@@ -540,7 +685,7 @@ async function handleTeamSubmit(e) {
 // Exponer funciones globalmente
 window.editTeam = editTeam;
 window.cancelTeamEdit = cancelTeamEdit;
-window.deleteTeam = deleteTeam;
+// window.deleteTeam ya está definido al inicio del archivo
 window.changeTeamLogo = changeTeamLogo;
 
 // ==================== CLUBS MANAGEMENT ====================
@@ -581,6 +726,7 @@ function renderClubs() {
     clubs.forEach(club => {
         const clubCard = document.createElement('div');
         clubCard.className = 'club-card';
+        const clubId = club._id || club.id; // MongoDB usa _id
         clubCard.innerHTML = `
             <div class="club-logo">
                 ${club.logo ? 
@@ -593,12 +739,13 @@ function renderClubs() {
             <div class="club-stats">
                 <span>Fundado: ${club.founded}</span>
                 <span>Jugadores: ${club.players}</span>
+                <span>ID: ${clubId}</span>
             </div>
             <div class="club-actions">
-                <button class="btn btn-small" onclick="window.editClub(${club.id})">
+                <button class="btn btn-small" data-club-id="${clubId}" onclick="window.editClub('${clubId}')">
                     <i class="fas fa-edit"></i> Editar
                 </button>
-                <button class="btn btn-danger btn-small" onclick="window.deleteClub(${club.id})">
+                <button class="btn btn-danger btn-small" data-club-id="${clubId}" onclick="window.deleteClub('${clubId}')">
                     <i class="fas fa-trash"></i> Eliminar
                 </button>
             </div>
@@ -610,14 +757,14 @@ function renderClubs() {
 async function handleClubSubmit(e) {
     e.preventDefault();
     
-    const formData = new FormData(e.target);
-    const clubId = formData.get('clubId');
+    const originalFormData = new FormData(e.target);
+    const clubId = originalFormData.get('clubId');
     
     // Validar datos
-    const clubName = formData.get('clubName').trim();
-    const clubDescription = formData.get('clubDescription').trim();
-    const clubFounded = parseInt(formData.get('clubFounded'));
-    const clubPlayers = parseInt(formData.get('clubPlayers'));
+    const clubName = originalFormData.get('clubName')?.trim();
+    const clubDescription = originalFormData.get('clubDescription')?.trim();
+    const clubFounded = parseInt(originalFormData.get('clubFounded'));
+    const clubPlayers = parseInt(originalFormData.get('clubPlayers'));
     
     if (!clubName || !clubDescription || !clubFounded || !clubPlayers) {
         showNotification('Por favor completa todos los campos', 'error');
@@ -635,6 +782,19 @@ async function handleClubSubmit(e) {
     }
     
     try {
+        // Crear nuevo FormData con los nombres correctos que espera el backend
+        const formData = new FormData();
+        formData.append('name', clubName);
+        formData.append('description', clubDescription);
+        formData.append('founded', clubFounded);
+        formData.append('players', clubPlayers);
+        
+        // Agregar logo si existe
+        const logoFile = originalFormData.get('clubLogo');
+        if (logoFile && logoFile.size > 0) {
+            formData.append('logo', logoFile);
+        }
+        
         const url = clubId ? `/api/clubs/${clubId}` : '/api/clubs';
         const method = clubId ? 'PUT' : 'POST';
         
@@ -662,11 +822,14 @@ async function handleClubSubmit(e) {
 }
 
 function editClub(clubId) {
-    const club = clubs.find(c => c.id === clubId);
-    if (!club) return;
+    const club = clubs.find(c => (c._id || c.id) === clubId);
+    if (!club) {
+        console.error('❌ Club no encontrado con ID:', clubId);
+        return;
+    }
     
     // Llenar formulario con datos del club
-    document.getElementById('clubId').value = club.id;
+    document.getElementById('clubId').value = club._id || club.id;
     document.getElementById('clubName').value = club.name;
     document.getElementById('clubDescription').value = club.description;
     document.getElementById('clubFounded').value = club.founded;
@@ -693,7 +856,7 @@ function cancelClubEdit() {
 async function deleteClub(clubId) {
     console.log('🗑️ Intentando eliminar club ID:', clubId);
     
-    const club = clubs.find(c => c.id == clubId || c.id === parseInt(clubId));
+    const club = clubs.find(c => (c._id || c.id) === clubId || (c._id || c.id) === parseInt(clubId));
     if (!club) {
         console.error('❌ Club no encontrado con ID:', clubId);
         alert('Error: Club no encontrado');
@@ -768,19 +931,21 @@ let teamPlayers = [];
 
 // Cargar jugadores y equipos
 async function loadPlayers() {
+    console.log('🎯 INICIANDO loadPlayers()...');
     try {
         const response = await fetch('/api/players');
         if (!response.ok) throw new Error('Error fetching players');
         
         players = await response.json();
-        console.log('✅ Jugadores cargados:', players);
+        console.log('✅ Jugadores cargados:', players.length);
         
         // Cargar equipos y crear pestañas
+        console.log('🏆 Cargando equipos para pestañas...');
         await loadTeamsForPlayerManagement();
         setupPlayerEventListeners();
         
     } catch (error) {
-        console.error('Error loading players:', error);
+        console.error('❌ Error loading players:', error);
         showNotification('Error cargando jugadores', 'error');
         players = [];
     }
@@ -789,26 +954,34 @@ async function loadPlayers() {
 // Cargar equipos para el sistema de pestañas
 async function loadTeamsForPlayerManagement() {
     try {
+        console.log('🔄 Obteniendo equipos desde /api/teams...');
         const response = await fetch('/api/teams');
         if (!response.ok) throw new Error('Error fetching teams');
         
         const teams = await response.json();
+        console.log('🏆 Equipos obtenidos para pestañas:', teams.length, teams);
         renderTeamTabs(teams);
         
     } catch (error) {
-        console.error('Error loading teams:', error);
+        console.error('❌ Error loading teams:', error);
         showNotification('Error cargando equipos', 'error');
     }
 }
 
 // Renderizar pestañas de equipos
 function renderTeamTabs(teams) {
+    console.log('🎨 RENDERIZANDO PESTAÑAS DE EQUIPOS...');
     const teamTabsContainer = document.getElementById('teamTabs');
-    if (!teamTabsContainer) return;
+    if (!teamTabsContainer) {
+        console.error('❌ Elemento teamTabs no encontrado!');
+        return;
+    }
     
+    console.log('📋 Contenedor teamTabs encontrado:', teamTabsContainer);
     teamTabsContainer.innerHTML = '';
     
     if (teams.length === 0) {
+        console.log('⚠️ No hay equipos para mostrar');
         teamTabsContainer.innerHTML = `
             <div style="text-align: center; color: rgba(255,255,255,0.6); padding: 20px;">
                 <p>No hay equipos disponibles. Agrega equipos primero en la pestaña de Equipos.</p>
@@ -817,16 +990,19 @@ function renderTeamTabs(teams) {
         return;
     }
     
+    console.log('🏆 Renderizando', teams.length, 'equipos como pestañas...');
+    
     teams.forEach(team => {
         const tabElement = document.createElement('div');
         tabElement.className = 'team-tab';
-        tabElement.dataset.teamId = team.id;
+        const teamId = team._id || team.id; // MongoDB usa _id
+        tabElement.dataset.teamId = teamId;
         tabElement.innerHTML = `
             <i class="fas fa-users"></i>
             ${team.name}
         `;
         
-        tabElement.addEventListener('click', () => selectTeam(team.id, team.name));
+        tabElement.addEventListener('click', () => selectTeam(teamId, team.name));
         teamTabsContainer.appendChild(tabElement);
     });
 }
@@ -863,7 +1039,18 @@ function selectTeam(teamId, teamName) {
 
 // Cargar jugadores del equipo seleccionado
 function loadTeamPlayers(teamId) {
-    teamPlayers = players.filter(player => player.clubId === teamId);
+    console.log('🔄 CARGANDO JUGADORES DEL EQUIPO:', teamId);
+    console.log('📋 Array global players:', players.length, players);
+    
+    // Filtrar jugadores por team ID (no clubId)
+    teamPlayers = players.filter(player => {
+        const playerTeamId = player.team?._id || player.team;
+        const match = playerTeamId === teamId;
+        console.log(`🏆 Jugador ${player.name}: team=${playerTeamId}, match=${match}`);
+        return match;
+    });
+    
+    console.log('✅ Jugadores del equipo encontrados:', teamPlayers.length, teamPlayers);
     renderTeamPlayers();
 }
 
@@ -921,10 +1108,10 @@ function renderTeamPlayers() {
                         </div>
                     </div>
                     <div style="display: flex; gap: 3px; margin-left: 8px;">
-                        <button onclick="editPlayerQuick('${player.id}')" style="background: rgba(0,255,136,0.2); border: 1px solid #00ff88; color: #00ff88; padding: 4px; border-radius: 4px; cursor: pointer; font-size: 10px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">
+                        <button onclick="editPlayerQuick('${player._id || player.id}')" style="background: rgba(0,255,136,0.2); border: 1px solid #00ff88; color: #00ff88; padding: 4px; border-radius: 4px; cursor: pointer; font-size: 10px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">
                             <i class="fas fa-edit"></i>
                         </button>
-                        <button onclick="deletePlayerQuick('${player.id}')" style="background: rgba(255,0,0,0.2); border: 1px solid #ff4444; color: #ff4444; padding: 4px; border-radius: 4px; cursor: pointer; font-size: 10px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">
+                        <button onclick="deletePlayerQuick('${player._id || player.id}')" style="background: rgba(255,0,0,0.2); border: 1px solid #ff4444; color: #ff4444; padding: 4px; border-radius: 4px; cursor: pointer; font-size: 10px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">
                             <i class="fas fa-trash"></i>
                         </button>
                     </div>
@@ -939,7 +1126,7 @@ function renderTeamPlayers() {
                                value="${player.goals || 0}" 
                                min="0" 
                                max="999"
-                               onchange="updatePlayerStats('${player.id}', 'goals', this.value)"
+                               onchange="updatePlayerStats('${player._id || player.id}', 'goals', this.value)"
                                style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 2px 4px; border-radius: 3px; width: 35px; font-size: 10px; text-align: center;">
                     </div>
                     <div style="flex: 1; display: flex; align-items: center; gap: 4px;">
@@ -949,7 +1136,7 @@ function renderTeamPlayers() {
                                value="${player.assists || 0}" 
                                min="0" 
                                max="999"
-                               onchange="updatePlayerStats('${player.id}', 'assists', this.value)"
+                               onchange="updatePlayerStats('${player._id || player.id}', 'assists', this.value)"
                                style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 2px 4px; border-radius: 3px; width: 35px; font-size: 10px; text-align: center;">
                     </div>
                 </div>
@@ -992,64 +1179,102 @@ function setupPlayerEventListeners() {
 
 // Agregar jugador rápidamente
 async function addPlayerQuick() {
+    console.log('🎯 INICIANDO addPlayerQuick()...');
+    
     const quickInput = document.getElementById('quickPlayerInput');
     const playerName = quickInput.value.trim();
     
+    console.log('📝 Nombre del jugador:', playerName);
+    console.log('🆔 selectedTeamId:', selectedTeamId);
+    
     if (!playerName) {
+        console.log('❌ Error: Nombre vacío');
         showNotification('Por favor ingresa un nombre', 'error');
         return;
     }
     
     if (!selectedTeamId) {
+        console.log('❌ Error: No hay equipo seleccionado');
         showNotification('Por favor selecciona un equipo', 'error');
         return;
     }
     
+    const playerData = {
+        name: playerName,
+        teamId: selectedTeamId,
+        position: 'Jugador',
+        age: 25,
+        number: getNextAvailableNumber(),
+        nationality: 'Panamá'
+    };
+    
+    console.log('📦 Datos del jugador a enviar:', playerData);
+    
     try {
+        console.log('🚀 Enviando POST a /api/players...');
+        
         const response = await fetch('/api/players', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                name: playerName,
-                clubId: selectedTeamId,
-                position: 'Jugador',
-                age: 25,
-                number: getNextAvailableNumber(),
-                nationality: 'Panamá'
-            })
+            body: JSON.stringify(playerData)
         });
         
+        console.log('📡 Respuesta del servidor:', response.status, response.statusText);
+        
         if (!response.ok) {
-            throw new Error('Error al agregar jugador');
+            const errorData = await response.json();
+            console.log('❌ Error del servidor:', errorData);
+            throw new Error(errorData.error || 'Error al agregar jugador');
         }
         
         const newPlayer = await response.json();
+        console.log('✅ Jugador creado exitosamente:', newPlayer);
+        
         // No agregar manualmente - el WebSocket se encarga de la actualización
         // players.push(newPlayer); // Removido para evitar duplicación
+        console.log('🔄 Recargando jugadores del equipo...');
         loadTeamPlayers(selectedTeamId);
         
         quickInput.value = '';
         quickInput.focus();
         
         showNotification(`Jugador "${playerName}" agregado exitosamente`, 'success');
+        console.log('✅ addPlayerQuick completado exitosamente');
         
     } catch (error) {
-        console.error('Error adding player:', error);
-        showNotification('Error al agregar jugador', 'error');
+        console.error('❌ Error completo en addPlayerQuick:', error);
+        console.error('❌ Stack trace:', error.stack);
+        showNotification(error.message || 'Error al agregar jugador', 'error');
     }
 }
 
 // Obtener siguiente número disponible
 function getNextAvailableNumber() {
-    const usedNumbers = teamPlayers.map(p => p.number).filter(n => n);
+    console.log('🔢 Calculando siguiente número disponible...');
+    console.log('📄 teamPlayers:', teamPlayers);
+    
+    // Obtener jugadores del equipo seleccionado desde el array global players
+    const teamPlayersFiltered = players.filter(p => {
+        const playerTeamId = p.team?._id || p.team;
+        return playerTeamId === selectedTeamId;
+    });
+    
+    console.log('🏆 Jugadores del equipo seleccionado:', teamPlayersFiltered);
+    
+    const usedNumbers = teamPlayersFiltered.map(p => p.number).filter(n => n && !isNaN(n));
+    console.log('🔢 Números ocupados:', usedNumbers);
+    
     for (let i = 1; i <= 99; i++) {
         if (!usedNumbers.includes(i)) {
+            console.log('✅ Siguiente número disponible:', i);
             return i;
         }
     }
-    return 1;
+    
+    console.log('⚠️ No hay números disponibles, usando 99');
+    return 99;
 }
 
 // Editar jugador (versión rápida)
@@ -1090,6 +1315,66 @@ async function updatePlayerQuick(playerId, updates) {
     } catch (error) {
         console.error('Error updating player:', error);
         showNotification('Error al actualizar jugador', 'error');
+    }
+}
+
+// Eliminar jugador (versión rápida)
+async function deletePlayerQuick(playerId) {
+    console.log('🗑️ INICIANDO deletePlayerQuick:', playerId);
+    
+    // Buscar jugador por ID (MongoDB usa _id)
+    const player = players.find(p => (p._id || p.id) === playerId);
+    if (!player) {
+        console.error('❌ Jugador no encontrado con ID:', playerId);
+        showNotification('Error: Jugador no encontrado', 'error');
+        return;
+    }
+    
+    console.log('🔍 Jugador encontrado:', player.name);
+    
+    const confirmed = confirm(`¿Estás seguro de que quieres eliminar al jugador "${player.name}"?`);
+    if (!confirmed) {
+        console.log('❌ Eliminación cancelada por el usuario');
+        return;
+    }
+    
+    try {
+        console.log('🚀 Enviando DELETE a /api/players/' + playerId);
+        
+        const response = await fetch(`/api/players/${playerId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        console.log('📡 Respuesta del servidor:', response.status, response.statusText);
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            console.error('❌ Error del servidor:', errorData);
+            throw new Error(errorData.error || 'Error al eliminar jugador');
+        }
+        
+        console.log('✅ Jugador eliminado exitosamente del servidor');
+        
+        // Actualizar array local
+        const playerIndex = players.findIndex(p => (p._id || p.id) === playerId);
+        if (playerIndex !== -1) {
+            players.splice(playerIndex, 1);
+            console.log('✅ Jugador eliminado del array local');
+        }
+        
+        // Recargar lista de jugadores del equipo
+        loadTeamPlayers(selectedTeamId);
+        
+        showNotification(`Jugador "${player.name}" eliminado exitosamente`, 'success');
+        console.log('✅ deletePlayerQuick completado exitosamente');
+        
+    } catch (error) {
+        console.error('❌ Error completo en deletePlayerQuick:', error);
+        console.error('❌ Stack trace:', error.stack);
+        showNotification(error.message || 'Error al eliminar jugador', 'error');
     }
 }
 
@@ -1138,21 +1423,22 @@ function deletePlayerQuick(playerId) {
     console.log('📊 Array de jugadores del equipo actual:', teamPlayers);
     console.log('📊 Array global de jugadores:', players);
     
-    // Convertir playerId a número si es string
-    const numericPlayerId = typeof playerId === 'string' ? parseInt(playerId) : playerId;
-    console.log('🔢 PlayerId convertido a:', numericPlayerId, 'tipo:', typeof numericPlayerId);
+    // NO convertir a número - mantener como string para MongoDB IDs
+    console.log('🔍 Buscando jugador con ID:', playerId);
     
     // Buscar primero en teamPlayers (jugadores del equipo actual)
     let player = teamPlayers.find(p => {
-        console.log('Comparando en teamPlayers:', p.id, 'tipo:', typeof p.id, 'con', numericPlayerId, 'tipo:', typeof numericPlayerId);
-        return p.id == numericPlayerId; // Usar == para comparación flexible
+        const playerIdToCompare = p._id || p.id;
+        console.log('Comparando en teamPlayers:', playerIdToCompare, 'con', playerId);
+        return playerIdToCompare === playerId || playerIdToCompare == playerId;
     });
     
     // Si no se encuentra en teamPlayers, buscar en el array global
     if (!player) {
         player = players.find(p => {
-            console.log('Comparando en players:', p.id, 'tipo:', typeof p.id, 'con', numericPlayerId, 'tipo:', typeof numericPlayerId);
-            return p.id == numericPlayerId; // Usar == para comparación flexible
+            const playerIdToCompare = p._id || p.id;
+            console.log('Comparando en players:', playerIdToCompare, 'con', playerId);
+            return playerIdToCompare === playerId || playerIdToCompare == playerId;
         });
     }
     
@@ -1160,8 +1446,8 @@ function deletePlayerQuick(playerId) {
     
     if (!player) {
         console.error('❌ Jugador no encontrado con ID:', playerId);
-        console.error('❌ teamPlayers:', teamPlayers.map(p => ({ id: p.id, name: p.name })));
-        console.error('❌ players:', players.map(p => ({ id: p.id, name: p.name })));
+        console.error('❌ teamPlayers IDs:', teamPlayers.map(p => ({ id: p._id || p.id, name: p.name })));
+        console.error('❌ players IDs:', players.map(p => ({ id: p._id || p.id, name: p.name })));
         showNotification('Jugador no encontrado', 'error');
         return;
     }
@@ -1169,7 +1455,7 @@ function deletePlayerQuick(playerId) {
     console.log('❓ Mostrando diálogo de confirmación...');
     if (confirm(`¿Estás seguro de que quieres eliminar a "${player.name}"?`)) {
         console.log('✅ Usuario confirmó eliminación, llamando deletePlayerFromAPI...');
-        deletePlayerFromAPI(numericPlayerId);
+        deletePlayerFromAPI(playerId);
     } else {
         console.log('❌ Usuario canceló eliminación');
     }
@@ -1216,129 +1502,14 @@ async function deletePlayerFromAPI(playerId) {
 
 // ==================== TEAMS MANAGEMENT ====================
 
-async function loadTeams() {
-    try {
-        const response = await fetch('/api/teams');
-        if (!response.ok) throw new Error('Error fetching teams');
-        
-        teams = await response.json();
-        renderTeams();
-        populateTeamSelects();
-    } catch (error) {
-        console.error('Error loading teams:', error);
-        showNotification('Error cargando equipos', 'error');
-    }
-}
+// Función loadTeams duplicada eliminada
+// La función loadTeams principal ya está definida al inicio del archivo
 
-function renderTeams() {
-    const teamsGrid = document.getElementById('teamsGrid');
-    if (!teamsGrid) return;
+// Función handleTeamSubmit duplicada eliminada
+// La función handleTeamSubmit principal ya está definida al inicio del archivo
 
-    teamsGrid.innerHTML = '';
-
-    teams.forEach(team => {
-        const teamCard = document.createElement('div');
-        teamCard.className = 'team-card';
-        
-        // Detectar si hay logo personalizado
-        const hasCustomLogo = team.logo && 
-                             team.logo !== 'img/default-team.png' && 
-                             team.logo !== 'undefined' && 
-                             team.logo !== 'null' && 
-                             team.logo !== '' && 
-                             typeof team.logo === 'string' && 
-                             team.logo.trim() !== '';
-        
-        const logoImg = hasCustomLogo ? 
-            `<img src="${team.logo}" alt="Logo ${team.name}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 8px; margin-right: 10px;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">` + 
-            `<div style="width: 50px; height: 50px; background: rgba(255,0,0,0.1); border: 2px dashed #ff0000; border-radius: 8px; display: none; align-items: center; justify-content: center; margin-right: 10px;"><i class="fas fa-exclamation-triangle" style="color: #ff0000;" title="Error cargando imagen"></i></div>` :
-            `<div style="width: 50px; height: 50px; background: rgba(0,255,136,0.1); border: 2px dashed #00ff88; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-right: 10px;"><i class="fas fa-image" style="color: #00ff88;"></i></div>`;
-        
-        teamCard.innerHTML = `
-            <div style="display: flex; align-items: center; margin-bottom: 15px;">
-                ${logoImg}
-                <div>
-                    <div class="team-name">${team.name}</div>
-                    <div style="color: rgba(255,255,255,0.6); font-size: 12px;">
-                        ${hasCustomLogo ? `Logo: ${team.logo.substring(0, 30)}...` : 'Logo por defecto'}
-                    </div>
-                </div>
-            </div>
-            <div class="team-actions">
-                <button class="btn btn-danger" onclick="deleteTeam(${team.id})">
-                    <i class="fas fa-trash"></i> Eliminar
-                </button>
-            </div>
-        `;
-        teamsGrid.appendChild(teamCard);
-    });
-}
-
-async function handleTeamSubmit(e) {
-    e.preventDefault();
-    
-    const formData = new FormData(e.target);
-    const teamName = formData.get('teamName').trim();
-    const logoFile = formData.get('teamLogo');
-
-    if (!teamName) {
-        showNotification('El nombre del equipo es requerido', 'error');
-        return;
-    }
-
-    // Crear FormData para enviar archivo
-    const submitFormData = new FormData();
-    submitFormData.append('name', teamName);
-    
-    // Solo agregar el logo si se seleccionó un archivo
-    if (logoFile && logoFile.size > 0) {
-        submitFormData.append('logo', logoFile);
-    }
-
-    try {
-        const response = await fetch('/api/teams', {
-            method: 'POST',
-            body: submitFormData // No incluir Content-Type header para FormData
-        });
-
-        const result = await response.json();
-
-        if (response.ok) {
-            showNotification('Equipo agregado exitosamente', 'success');
-            e.target.reset();
-            await loadTeams();
-        } else {
-            showNotification(result.error || 'Error agregando equipo', 'error');
-        }
-    } catch (error) {
-        console.error('Error adding team:', error);
-        showNotification('Error de conexión', 'error');
-    }
-}
-
-async function deleteTeam(teamId) {
-    if (!confirm('¿Estás seguro de que quieres eliminar este equipo?')) {
-        return;
-    }
-
-    try {
-        const response = await fetch(`/api/teams/${teamId}`, {
-            method: 'DELETE'
-        });
-
-        const result = await response.json();
-
-        if (response.ok) {
-            showNotification('Equipo eliminado exitosamente', 'success');
-            await loadTeams();
-        } else {
-            showNotification(result.error || 'Error eliminando equipo', 'error');
-        }
-    } catch (error) {
-        console.error('Error deleting team:', error);
-        showNotification('Error de conexión', 'error');
-    }
-}
+// Función deleteTeam duplicada eliminada
+// La función window.deleteTeam ya está definida al inicio del archivo
 
 // Poblar selects de equipos
 function populateTeamSelects() {
@@ -1379,21 +1550,81 @@ function populateTeamSelects() {
         });
 }
 
+// ==================== TEAM SELECTS POPULATION ====================
+
+function populateTeamSelects() {
+    console.log('🏆 POBLANDO SELECTORES DE EQUIPOS...');
+    const homeTeamSelect = document.getElementById('homeTeam');
+    const awayTeamSelect = document.getElementById('awayTeam');
+    
+    console.log('🏠 homeTeamSelect:', homeTeamSelect);
+    console.log('✈️ awayTeamSelect:', awayTeamSelect);
+    
+    if (!homeTeamSelect || !awayTeamSelect) {
+        console.error('❌ Selectores de equipos no encontrados');
+        return;
+    }
+    
+    // Limpiar selects
+    homeTeamSelect.innerHTML = '<option value="">Cargando equipos...</option>';
+    awayTeamSelect.innerHTML = '<option value="">Cargando equipos...</option>';
+    
+    // Cargar equipos desde la API
+    fetch('/api/teams')
+        .then(response => response.json())
+        .then(teams => {
+            console.log('🏆 Equipos obtenidos para selectores:', teams);
+            
+            // Limpiar selects
+            homeTeamSelect.innerHTML = '<option value="">Seleccionar equipo...</option>';
+            awayTeamSelect.innerHTML = '<option value="">Seleccionar equipo...</option>';
+            
+            // Agregar equipos a ambos selects
+            teams.forEach(team => {
+                const option1 = document.createElement('option');
+                option1.value = team.name; // Usar team.name como valor
+                option1.textContent = team.name;
+                homeTeamSelect.appendChild(option1);
+                
+                const option2 = document.createElement('option');
+                option2.value = team.name; // Usar team.name como valor
+                option2.textContent = team.name;
+                awayTeamSelect.appendChild(option2);
+                
+                console.log('✅ Equipo agregado a selectores:', team.name);
+            });
+            
+            console.log('✅ Selectores de equipos poblados exitosamente');
+        })
+        .catch(error => {
+            console.error('❌ Error cargando equipos:', error);
+            homeTeamSelect.innerHTML = '<option value="">Error al cargar equipos</option>';
+            awayTeamSelect.innerHTML = '<option value="">Error al cargar equipos</option>';
+        });
+}
+
 // ==================== MATCHES MANAGEMENT ====================
 
 async function loadMatches() {
+    console.log('🎯 DEPURACIÓN: Iniciando loadMatches()');
     const matchesGrid = document.getElementById('matchesGrid');
-    if (!matchesGrid) return;
+    console.log('🎯 DEPURACIÓN: matchesGrid encontrado:', !!matchesGrid);
+    
+    if (!matchesGrid) {
+        console.error('❌ DEPURACIÓN: matchesGrid NO encontrado!');
+        return;
+    }
     
     // Mostrar indicador de carga
     matchesGrid.innerHTML = '<div class="loading">Cargando partidos...</div>';
+    console.log('🎯 DEPURACIÓN: Indicador de carga mostrado');
     
     try {
         // Agregar timeout para evitar que se quede cargando indefinidamente
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos de timeout
         
-        const response = await fetch('/api/tournament/matches', {
+        const response = await fetch('/api/matches', {
             signal: controller.signal
         });
         
@@ -1404,9 +1635,10 @@ async function loadMatches() {
         }
         
         matches = await response.json();
-        console.log('Partidos cargados:', matches); // Debug
+        console.log('🎯 DEPURACIÓN: Partidos cargados desde API:', matches.length, matches);
         
         // Siempre renderizar los partidos cuando se cargan
+        console.log('🎯 DEPURACIÓN: Llamando renderMatches()...');
         renderMatches();
     } catch (error) {
         console.error('Error loading matches:', error);
@@ -1423,11 +1655,15 @@ async function loadMatches() {
 }
 
 function renderMatches() {
-    console.log('🎯 Iniciando renderMatches...');
+    console.log('🎯 DEPURACIÓN: Iniciando renderMatches...');
+    console.log('🎯 DEPURACIÓN: Variable matches:', matches);
+    console.log('🎯 DEPURACIÓN: matches.length:', matches ? matches.length : 'undefined');
+    
     const matchesGrid = document.getElementById('matchesGrid');
+    console.log('🎯 DEPURACIÓN: matchesGrid encontrado en renderMatches:', !!matchesGrid);
     
     if (!matchesGrid) {
-        console.error('❌ No se encontró el elemento matchesGrid');
+        console.error('❌ DEPURACIÓN: matchesGrid NO encontrado en renderMatches!');
         return;
     }
     
@@ -1481,7 +1717,7 @@ function renderMatches() {
             const matchDate = String(match.date || 'Sin fecha');
             const matchTime = String(match.time || 'Sin hora');
             const matchday = String(match.matchday || 'N/A');
-            const matchId = match.id || 'unknown';
+            const matchId = match._id || match.id || 'unknown';
 
             // HTML simplificado y seguro
             matchCard.innerHTML = `
@@ -1538,18 +1774,31 @@ async function handleMatchSubmit(e) {
         matchday: parseInt(formData.get('matchday'))
     };
 
+    console.log('🏆 DATOS DEL PARTIDO:', matchData);
+    console.log('🏠 Equipo local:', matchData.homeTeam, 'tipo:', typeof matchData.homeTeam);
+    console.log('✈️ Equipo visitante:', matchData.awayTeam, 'tipo:', typeof matchData.awayTeam);
+    console.log('🔍 Comparación ===:', matchData.homeTeam === matchData.awayTeam);
+    console.log('🔍 Comparación ==:', matchData.homeTeam == matchData.awayTeam);
+    
     if (!matchData.homeTeam || !matchData.awayTeam || !matchData.date || !matchData.time) {
         showNotification('Todos los campos son requeridos', 'error');
         return;
     }
 
     if (matchData.homeTeam === matchData.awayTeam) {
+        console.error('❌ ERROR: Equipos iguales detectados!');
+        console.error('❌ homeTeam:', JSON.stringify(matchData.homeTeam));
+        console.error('❌ awayTeam:', JSON.stringify(matchData.awayTeam));
         showNotification('Un equipo no puede jugar contra sí mismo', 'error');
         return;
     }
+    
+    console.log('✅ Validación de equipos pasada - equipos diferentes');
+    console.log('✅ homeTeam:', matchData.homeTeam);
+    console.log('✅ awayTeam:', matchData.awayTeam);
 
     try {
-        const response = await fetch('/api/tournament/matches', {
+        const response = await fetch('/api/matches', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -1578,7 +1827,7 @@ async function deleteMatch(matchId) {
     }
 
     try {
-        const response = await fetch(`/api/tournament/matches/${matchId}`, {
+        const response = await fetch(`/api/matches/${matchId}`, {
             method: 'DELETE'
         });
 
@@ -1716,15 +1965,22 @@ function renderCalendarMatches(matches) {
 // ==================== RESULTS MANAGEMENT ====================
 
 async function loadPendingMatches() {
+    console.log('🎯 DEPURACIÓN: Iniciando loadPendingMatches()');
     const resultsGrid = document.getElementById('resultsGrid');
-    if (!resultsGrid) return;
+    console.log('🎯 DEPURACIÓN: resultsGrid encontrado:', !!resultsGrid);
+    
+    if (!resultsGrid) {
+        console.error('❌ DEPURACIÓN: resultsGrid NO encontrado!');
+        return;
+    }
     
     // Mostrar indicador de carga
     resultsGrid.innerHTML = '<div class="loading">Cargando partidos...</div>';
+    console.log('🎯 DEPURACIÓN: Indicador de carga mostrado en results');
     
     try {
         // Cargar TODOS los partidos (programados y finalizados)
-        const response = await fetch('/api/tournament/matches');
+        const response = await fetch('/api/matches');
         if (!response.ok) throw new Error('Error fetching matches');
         
         const allMatches = await response.json();
@@ -1778,10 +2034,10 @@ function renderAllMatches(allMatches) {
                     <i class="fas fa-info-circle"></i> Programado
                 </div>
                 <div class="match-result">
-                    <input type="number" id="homeScore_${match.id}" min="0" placeholder="0" style="width: 60px;">
+                    <input type="number" id="homeScore_${match._id}" min="0" placeholder="0" style="width: 60px;">
                     <span class="vs-text">-</span>
-                    <input type="number" id="awayScore_${match.id}" min="0" placeholder="0" style="width: 60px;">
-                    <button class="btn" onclick="updateMatchResult(${match.id})">
+                    <input type="number" id="awayScore_${match._id}" min="0" placeholder="0" style="width: 60px;">
+                    <button class="btn" onclick="updateMatchResult('${match._id}')">
                         <i class="fas fa-save"></i> Guardar
                     </button>
                 </div>
@@ -1811,13 +2067,13 @@ function renderAllMatches(allMatches) {
                     <i class="fas fa-check-circle"></i> Finalizado
                 </div>
                 <div class="match-result">
-                    <input type="number" id="homeScore_${match.id}" min="0" value="${match.homeScore}" style="width: 60px;">
+                    <input type="number" id="homeScore_${match._id}" min="0" value="${match.homeScore}" style="width: 60px;">
                     <span class="vs-text">-</span>
-                    <input type="number" id="awayScore_${match.id}" min="0" value="${match.awayScore}" style="width: 60px;">
-                    <button class="btn" onclick="updateMatchResult(${match.id})">
+                    <input type="number" id="awayScore_${match._id}" min="0" value="${match.awayScore}" style="width: 60px;">
+                    <button class="btn" onclick="updateMatchResult('${match._id}')">
                         <i class="fas fa-edit"></i> Editar
                     </button>
-                    <button class="btn btn-danger" onclick="clearMatchResult(${match.id})">
+                    <button class="btn btn-danger" onclick="clearMatchResult('${match._id}')">
                         <i class="fas fa-undo"></i> Eliminar Resultado
                     </button>
                 </div>
@@ -1840,7 +2096,7 @@ async function updateMatchResult(matchId) {
     }
 
     try {
-        const response = await fetch(`/api/tournament/matches/${matchId}`, {
+        const response = await fetch(`/api/matches/${matchId}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json'
@@ -1901,7 +2157,7 @@ async function clearMatchResult(matchId) {
     }
 
     try {
-        const response = await fetch(`/api/tournament/matches/${matchId}`, {
+        const response = await fetch(`/api/matches/${matchId}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json'
@@ -1934,33 +2190,51 @@ let classificationZones = [];
 
 async function loadConfiguration() {
     try {
-        const response = await fetch('/api/settings');
-        if (response.ok) {
-            const settings = await response.json();
+        console.log('🔧 Cargando configuración desde MongoDB...');
+        
+        // Cargar zonas de clasificación desde el endpoint específico
+        const zonesResponse = await fetch('/api/settings/classification-zones');
+        
+        if (zonesResponse.ok) {
+            const zonesData = await zonesResponse.json();
             
-            // Cargar zonas de clasificación
-            if (settings.classificationZones && settings.classificationZones.length > 0) {
-                classificationZones = settings.classificationZones;
+            if (zonesData.success && zonesData.classificationZones) {
+                classificationZones = zonesData.classificationZones;
+                console.log('✅ Zonas de clasificación cargadas desde MongoDB:', classificationZones.length);
             } else {
-                // Zonas por defecto
+                console.warn('⚠️ No se encontraron zonas en MongoDB, usando por defecto');
                 classificationZones = [
                     { id: 1, name: 'Clasificación Directa', positions: '1-4', color: '#00ff88' },
                     { id: 2, name: 'Repechaje', positions: '5-8', color: '#ffa500' },
                     { id: 3, name: 'Eliminación', positions: '9-12', color: '#ff4757' }
                 ];
             }
-            
-            renderClassificationZones();
-            
-            // Cargar configuración general
-            document.getElementById('seasonName').value = settings.seasonName || 'Temporada 2025';
-            document.getElementById('pointsWin').value = settings.pointsWin || 3;
-            document.getElementById('pointsDraw').value = settings.pointsDraw || 1;
-            document.getElementById('playoffFormat').value = settings.playoffFormat || '8';
+        } else {
+            throw new Error(`Error ${zonesResponse.status}: ${zonesResponse.statusText}`);
         }
+        
+        // Renderizar las zonas cargadas
+        renderClassificationZones();
+        
+        // Cargar otras configuraciones del endpoint general
+        try {
+            const settingsResponse = await fetch('/api/settings');
+            if (settingsResponse.ok) {
+                const settings = await settingsResponse.json();
+                document.getElementById('seasonName').value = settings.seasonName || 'Temporada 2025';
+                document.getElementById('pointsWin').value = settings.pointsWin || 3;
+                document.getElementById('pointsDraw').value = settings.pointsDraw || 1;
+                document.getElementById('playoffFormat').value = settings.playoffFormat || '8';
+            }
+        } catch (settingsError) {
+            console.warn('⚠️ Error cargando configuraciones generales:', settingsError);
+        }
+        
     } catch (error) {
-        console.error('Error loading configuration:', error);
-        // Usar zonas por defecto en caso de error
+        console.error('❌ Error loading configuration:', error);
+        
+        // Solo usar zonas por defecto si hay un error real de conexión
+        console.warn('⚠️ Usando zonas por defecto debido a error de conexión');
         classificationZones = [
             { id: 1, name: 'Clasificación Directa', positions: '1-4', color: '#00ff88' },
             { id: 2, name: 'Repechaje', positions: '5-8', color: '#ffa500' },
@@ -1971,13 +2245,24 @@ async function loadConfiguration() {
 }
 
 function renderClassificationZones() {
+    console.log('🎨 INICIANDO RENDERIZADO DE ZONAS DE CLASIFICACIÓN...');
+    console.log('📊 Zonas a renderizar:', classificationZones.length, classificationZones);
+    
     const container = document.getElementById('classificationZones');
-    if (!container) return;
+    console.log('📦 Contenedor encontrado:', !!container, container);
+    
+    if (!container) {
+        console.error('❌ CONTENEDOR #classificationZones NO ENCONTRADO!');
+        return;
+    }
     
     container.innerHTML = '';
+    console.log('🧹 Contenedor limpiado');
     
     classificationZones.forEach((zone, index) => {
+        console.log(`🎯 Renderizando zona ${index + 1}:`, zone);
         const zoneDiv = document.createElement('div');
+        zoneDiv.className = 'zone-config'; // ✅ CLASE AGREGADA PARA COMPATIBILIDAD CON GUARDADO
         zoneDiv.style.cssText = `
             background: rgba(255, 255, 255, 0.05);
             border: 2px solid rgba(0, 255, 136, 0.3);
@@ -2013,7 +2298,11 @@ function renderClassificationZones() {
         `;
         
         container.appendChild(zoneDiv);
+        console.log(`✅ Zona ${index + 1} agregada al DOM`);
     });
+    
+    console.log(`✅ RENDERIZADO COMPLETADO: ${classificationZones.length} zonas agregadas al DOM`);
+    console.log('📦 Estado final del contenedor:', container.children.length, 'elementos');
 }
 
 function addClassificationZone() {
@@ -2102,10 +2391,527 @@ async function saveTournamentConfig() {
 
 let currentBracket = null;
 
+// ==================== PLAYOFFS MANAGEMENT ====================
+
 async function loadPlayoffsManagement() {
-    await loadTeamsForSelection();
-    await loadCurrentBracket();
+    console.log('🏆 Cargando gestión de playoffs...');
+    
+    try {
+        // Cargar equipos para selección
+        await loadTeamsForSelection();
+        
+        // Cargar bracket actual si existe
+        await loadCurrentBracket();
+        
+        console.log('✅ Gestión de playoffs cargada correctamente');
+    } catch (error) {
+        console.error('❌ Error cargando playoffs:', error);
+        showNotification('Error cargando playoffs: ' + error.message, 'error');
+    }
 }
+
+async function loadTeamsForSelection() {
+    const teamSelection = document.getElementById('teamSelection');
+    if (!teamSelection) {
+        console.warn('⚠️ Elemento teamSelection no encontrado');
+        return;
+    }
+    
+    try {
+        console.log('🏆 Cargando equipos para selección de playoffs...');
+        
+        // Obtener equipos desde la API
+        const response = await fetch('/api/teams');
+        if (!response.ok) {
+            throw new Error(`Error ${response.status}: ${response.statusText}`);
+        }
+        
+        const teams = await response.json();
+        console.log('✅ Equipos cargados:', teams.length);
+        
+        // Limpiar contenedor
+        teamSelection.innerHTML = '';
+        
+        // Crear checkboxes para cada equipo
+        teams.forEach(team => {
+            const teamCheckbox = document.createElement('div');
+            teamCheckbox.innerHTML = `
+                <label style="display: flex; align-items: center; color: white; cursor: pointer; padding: 8px; background: rgba(255,255,255,0.05); border-radius: 6px; margin-bottom: 5px;">
+                    <input type="checkbox" value="${team.name}" data-team-id="${team._id}" style="margin-right: 10px; transform: scale(1.2);">
+                    <i class="fas fa-shield-alt" style="margin-right: 8px; color: #00ff88;"></i>
+                    ${team.name}
+                </label>
+            `;
+            teamSelection.appendChild(teamCheckbox);
+        });
+        
+        console.log('✅ Checkboxes de equipos creados');
+        
+    } catch (error) {
+        console.error('❌ Error cargando equipos para playoffs:', error);
+        teamSelection.innerHTML = '<p style="color: #ff4757; text-align: center;">Error cargando equipos</p>';
+    }
+}
+
+async function loadCurrentBracket() {
+    const bracketContainer = document.getElementById('bracketContainer');
+    if (!bracketContainer) {
+        console.warn('⚠️ Elemento bracketContainer no encontrado');
+        return;
+    }
+    
+    try {
+        console.log('🏆 Cargando bracket actual...');
+        
+        const response = await fetch('/api/playoffs/bracket');
+        
+        if (response.status === 404) {
+            // No hay bracket generado
+            bracketContainer.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: rgba(255,255,255,0.6);">
+                    <i class="fas fa-trophy" style="font-size: 48px; margin-bottom: 20px; color: rgba(255,255,255,0.3);"></i>
+                    <h3>No hay bracket generado</h3>
+                    <p>Usa los botones de arriba para crear un bracket de playoffs</p>
+                </div>
+            `;
+            console.log('⚠️ No hay bracket generado');
+            return;
+        }
+        
+        if (!response.ok) {
+            throw new Error(`Error ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        const bracket = data.bracket || data;
+        
+        console.log('✅ Bracket cargado:', bracket);
+        
+        // Renderizar bracket
+        renderBracket(bracket);
+        
+    } catch (error) {
+        console.error('❌ Error cargando bracket:', error);
+        bracketContainer.innerHTML = `
+            <div style="text-align: center; padding: 40px; color: #ff4757;">
+                <i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 20px;"></i>
+                <h3>Error cargando bracket</h3>
+                <p>${error.message}</p>
+            </div>
+        `;
+    }
+}
+
+function renderBracket(bracket) {
+    const bracketContainer = document.getElementById('bracketContainer');
+    if (!bracketContainer) return;
+    
+    console.log('🏆 Renderizando bracket:', bracket.format, 'equipos, ida y vuelta:', bracket.isRoundTrip);
+    
+    let html = `
+        <div style="background: rgba(0,255,136,0.1); padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid rgba(0,255,136,0.3);">
+            <h4 style="color: #00ff88; margin: 0 0 10px 0;">
+                <i class="fas fa-info-circle"></i> Información del Bracket
+            </h4>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                <div>
+                    <strong>Formato:</strong> ${bracket.format} equipos
+                </div>
+                <div>
+                    <strong>Modalidad:</strong> ${bracket.isRoundTrip ? '🔄 Ida y Vuelta' : '⚡ Partido Único'}
+                </div>
+                <div>
+                    <strong>Partidos:</strong> ${bracket.matches ? bracket.matches.length : 0}
+                </div>
+                <div>
+                    <strong>Estado:</strong> <span style="color: #00ff88;">Activo</span>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    if (bracket.matches && bracket.matches.length > 0) {
+        html += '<div style="display: grid; gap: 15px;">';
+        
+        if (bracket.isRoundTrip) {
+            // Para ida y vuelta, agrupar partidos por enfrentamiento
+            const matchups = {};
+            
+            bracket.matches.forEach(match => {
+                const key = `${match.homeTeam}_vs_${match.awayTeam}_R${match.round}`;
+                if (!matchups[key]) {
+                    matchups[key] = {
+                        round: match.round,
+                        homeTeam: match.homeTeam,
+                        awayTeam: match.awayTeam,
+                        ida: null,
+                        vuelta: null
+                    };
+                }
+                
+                if (match.legNumber === 1) {
+                    matchups[key].ida = match;
+                } else {
+                    matchups[key].vuelta = match;
+                }
+            });
+            
+            // Renderizar cada enfrentamiento con ida y vuelta
+            Object.values(matchups).forEach(matchup => {
+                const roundName = getRoundDisplayName(matchup.round, bracket.format);
+                const idaFinished = matchup.ida && matchup.ida.status === 'finished';
+                const vueltaFinished = matchup.vuelta && matchup.vuelta.status === 'finished';
+                const bothFinished = idaFinished && vueltaFinished;
+                
+                html += `
+                    <div style="background: rgba(255,255,255,0.05); border: 2px solid ${bothFinished ? '#00ff88' : 'rgba(0,255,136,0.3)'}; border-radius: 10px; padding: 15px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <h5 style="color: #00ff88; margin: 0;">${roundName}</h5>
+                            <span style="background: ${bothFinished ? '#00ff88' : '#ffa502'}; color: ${bothFinished ? '#0a0a0a' : 'white'}; padding: 4px 8px; border-radius: 4px; font-size: 12px;">
+                                ${bothFinished ? 'Completado' : 'En Progreso'}
+                            </span>
+                        </div>
+                        
+                        <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                            <i class="fas fa-shield-alt" style="margin-right: 8px; color: #00ff88;"></i>
+                            <strong style="font-size: 16px;">${matchup.homeTeam} vs ${matchup.awayTeam}</strong>
+                        </div>
+                        
+                        <!-- PARTIDO DE IDA -->
+                        <div style="background: rgba(0,255,136,0.05); border: 1px solid rgba(0,255,136,0.2); border-radius: 6px; padding: 12px; margin-bottom: 10px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <h6 style="color: #00ff88; margin: 0; font-size: 14px;">
+                                    <i class="fas fa-play"></i> PARTIDO DE IDA
+                                </h6>
+                                <span style="font-size: 12px; color: rgba(255,255,255,0.6);">
+                                    ${idaFinished ? 'Terminado' : 'Programado'}
+                                </span>
+                            </div>
+                            
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div style="flex: 1;">
+                                    <div style="display: flex; align-items: center; margin-bottom: 3px;">
+                                        <i class="fas fa-home" style="margin-right: 8px; color: #00ff88; font-size: 12px;"></i>
+                                        <span>${matchup.homeTeam}</span>
+                                        ${idaFinished ? `<span style="margin-left: 10px; font-weight: bold; color: #00ff88;">${matchup.ida.homeScore}</span>` : ''}
+                                    </div>
+                                    <div style="display: flex; align-items: center;">
+                                        <i class="fas fa-plane" style="margin-right: 8px; color: rgba(255,255,255,0.6); font-size: 12px;"></i>
+                                        <span>${matchup.awayTeam}</span>
+                                        ${idaFinished ? `<span style="margin-left: 10px; font-weight: bold; color: #00ff88;">${matchup.ida.awayScore}</span>` : ''}
+                                    </div>
+                                </div>
+                                
+                                ${!idaFinished && matchup.ida ? `
+                                    <div style="display: flex; gap: 8px; align-items: center;">
+                                        <input type="number" id="homeScore_${matchup.ida.id}" placeholder="0" min="0" style="width: 45px; padding: 4px; text-align: center; background: rgba(255,255,255,0.1); border: 1px solid rgba(0,255,136,0.3); border-radius: 3px; color: white; font-size: 12px;">
+                                        <span style="color: rgba(255,255,255,0.6); font-size: 12px;">-</span>
+                                        <input type="number" id="awayScore_${matchup.ida.id}" placeholder="0" min="0" style="width: 45px; padding: 4px; text-align: center; background: rgba(255,255,255,0.1); border: 1px solid rgba(0,255,136,0.3); border-radius: 3px; color: white; font-size: 12px;">
+                                        <button onclick="updatePlayoffMatch('${matchup.ida.id}')" style="background: #00ff88; color: #0a0a0a; border: none; padding: 6px 8px; border-radius: 3px; cursor: pointer; font-weight: 600; font-size: 11px;">
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                        
+                        <!-- PARTIDO DE VUELTA -->
+                        <div style="background: rgba(255,165,0,0.05); border: 1px solid rgba(255,165,0,0.2); border-radius: 6px; padding: 12px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <h6 style="color: #ffa502; margin: 0; font-size: 14px;">
+                                    <i class="fas fa-undo"></i> PARTIDO DE VUELTA
+                                </h6>
+                                <span style="font-size: 12px; color: rgba(255,255,255,0.6);">
+                                    ${vueltaFinished ? 'Terminado' : 'Programado'}
+                                </span>
+                            </div>
+                            
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div style="flex: 1;">
+                                    <div style="display: flex; align-items: center; margin-bottom: 3px;">
+                                        <i class="fas fa-home" style="margin-right: 8px; color: #ffa502; font-size: 12px;"></i>
+                                        <span>${matchup.awayTeam}</span>
+                                        ${vueltaFinished ? `<span style="margin-left: 10px; font-weight: bold; color: #ffa502;">${matchup.vuelta.homeScore}</span>` : ''}
+                                    </div>
+                                    <div style="display: flex; align-items: center;">
+                                        <i class="fas fa-plane" style="margin-right: 8px; color: rgba(255,255,255,0.6); font-size: 12px;"></i>
+                                        <span>${matchup.homeTeam}</span>
+                                        ${vueltaFinished ? `<span style="margin-left: 10px; font-weight: bold; color: #ffa502;">${matchup.vuelta.awayScore}</span>` : ''}
+                                    </div>
+                                </div>
+                                
+                                ${!vueltaFinished && matchup.vuelta ? `
+                                    <div style="display: flex; gap: 8px; align-items: center;">
+                                        <input type="number" id="homeScore_${matchup.vuelta.id}" placeholder="0" min="0" style="width: 45px; padding: 4px; text-align: center; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,165,0,0.3); border-radius: 3px; color: white; font-size: 12px;">
+                                        <span style="color: rgba(255,255,255,0.6); font-size: 12px;">-</span>
+                                        <input type="number" id="awayScore_${matchup.vuelta.id}" placeholder="0" min="0" style="width: 45px; padding: 4px; text-align: center; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,165,0,0.3); border-radius: 3px; color: white; font-size: 12px;">
+                                        <button onclick="updatePlayoffMatch('${matchup.vuelta.id}')" style="background: #ffa502; color: #0a0a0a; border: none; padding: 6px 8px; border-radius: 3px; cursor: pointer; font-weight: 600; font-size: 11px;">
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                        
+                        ${bothFinished ? `
+                            <div style="margin-top: 10px; padding: 8px; background: rgba(0,255,136,0.1); border-radius: 4px; text-align: center;">
+                                <span style="color: #00ff88; font-weight: bold; font-size: 12px;">
+                                    <i class="fas fa-calculator"></i> 
+                                    Resultado Global: ${matchup.homeTeam} ${(matchup.ida.homeScore + matchup.vuelta.awayScore)} - ${(matchup.ida.awayScore + matchup.vuelta.homeScore)} ${matchup.awayTeam}
+                                </span>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            });
+            
+        } else {
+            // Para partido único, renderizado normal
+            bracket.matches.forEach((match, index) => {
+                const isFinished = match.status === 'finished';
+                const roundName = getRoundDisplayName(match.round, bracket.format);
+                
+                html += `
+                    <div style="background: rgba(255,255,255,0.05); border: 2px solid ${isFinished ? '#00ff88' : 'rgba(0,255,136,0.3)'}; border-radius: 10px; padding: 15px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <h5 style="color: #00ff88; margin: 0;">${roundName}</h5>
+                            <span style="background: ${isFinished ? '#00ff88' : '#ffa502'}; color: ${isFinished ? '#0a0a0a' : 'white'}; padding: 4px 8px; border-radius: 4px; font-size: 12px;">
+                                ${isFinished ? 'Terminado' : 'Programado'}
+                            </span>
+                        </div>
+                        
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div style="flex: 1;">
+                                <div style="display: flex; align-items: center; margin-bottom: 5px;">
+                                    <i class="fas fa-home" style="margin-right: 8px; color: #00ff88;"></i>
+                                    <strong>${match.homeTeam}</strong>
+                                    ${isFinished ? `<span style="margin-left: 10px; font-size: 18px; color: #00ff88;">${match.homeScore}</span>` : ''}
+                                </div>
+                                <div style="display: flex; align-items: center;">
+                                    <i class="fas fa-plane" style="margin-right: 8px; color: rgba(255,255,255,0.6);"></i>
+                                    <strong>${match.awayTeam}</strong>
+                                    ${isFinished ? `<span style="margin-left: 10px; font-size: 18px; color: #00ff88;">${match.awayScore}</span>` : ''}
+                                </div>
+                            </div>
+                            
+                            ${!isFinished ? `
+                                <div style="display: flex; gap: 10px; align-items: center;">
+                                    <input type="number" id="homeScore_${match.id}" placeholder="0" min="0" style="width: 50px; padding: 5px; text-align: center; background: rgba(255,255,255,0.1); border: 1px solid rgba(0,255,136,0.3); border-radius: 4px; color: white;">
+                                    <span style="color: rgba(255,255,255,0.6);">-</span>
+                                    <input type="number" id="awayScore_${match.id}" placeholder="0" min="0" style="width: 50px; padding: 5px; text-align: center; background: rgba(255,255,255,0.1); border: 1px solid rgba(0,255,136,0.3); border-radius: 4px; color: white;">
+                                    <button onclick="updatePlayoffMatch('${match.id}')" style="background: #00ff88; color: #0a0a0a; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-weight: 600;">
+                                        <i class="fas fa-check"></i> Actualizar
+                                    </button>
+                                </div>
+                            ` : ''}
+                        </div>
+                        
+                        ${match.date ? `<div style="margin-top: 10px; color: rgba(255,255,255,0.6); font-size: 14px;"><i class="fas fa-calendar"></i> ${new Date(match.date).toLocaleDateString()}</div>` : ''}
+                    </div>
+                `;
+            });
+        }
+        
+        html += '</div>';
+    } else {
+        html += '<p style="text-align: center; color: rgba(255,255,255,0.6);">No hay partidos generados</p>';
+    }
+    
+    bracketContainer.innerHTML = html;
+}
+
+function getRoundDisplayName(round, format) {
+    const numTeams = parseInt(format);
+    const roundNum = parseInt(round);
+    
+    if (numTeams === 4) {
+        return roundNum === 1 ? 'Semifinal' : 'Final';
+    } else if (numTeams === 8) {
+        if (roundNum === 1) return 'Cuartos de Final';
+        if (roundNum === 2) return 'Semifinal';
+        return 'Final';
+    } else if (numTeams === 16) {
+        if (roundNum === 1) return 'Octavos de Final';
+        if (roundNum === 2) return 'Cuartos de Final';
+        if (roundNum === 3) return 'Semifinal';
+        return 'Final';
+    }
+    
+    return `Ronda ${roundNum}`;
+}
+
+function showManualSelection() {
+    const manualSelection = document.getElementById('manualSelection');
+    if (manualSelection) {
+        const isVisible = manualSelection.style.display !== 'none';
+        manualSelection.style.display = isVisible ? 'none' : 'block';
+        
+        if (!isVisible) {
+            // Cargar equipos si se muestra la selección manual
+            loadTeamsForSelection();
+        }
+    }
+}
+
+async function generateBracket(format) {
+    console.log(`🏆 Generando bracket automático para ${format} equipos...`);
+    
+    try {
+        const isRoundTrip = document.getElementById('roundTripCheckbox')?.checked || false;
+        
+        const response = await fetch('/api/playoffs/bracket', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                format: format,
+                isRoundTrip: isRoundTrip,
+                type: 'automatic'
+            })
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `Error ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('✅ Bracket generado:', data);
+        
+        showNotification(`Bracket de ${format} equipos generado correctamente${isRoundTrip ? ' (ida y vuelta)' : ''}`, 'success');
+        
+        // Recargar bracket
+        await loadCurrentBracket();
+        
+    } catch (error) {
+        console.error('❌ Error generando bracket:', error);
+        showNotification('Error generando bracket: ' + error.message, 'error');
+    }
+}
+
+async function createCustomBracket() {
+    console.log('🏆 Creando bracket personalizado...');
+    
+    try {
+        // Obtener equipos seleccionados
+        const selectedTeams = [];
+        const checkboxes = document.querySelectorAll('#teamSelection input[type="checkbox"]:checked');
+        
+        checkboxes.forEach(checkbox => {
+            selectedTeams.push({
+                name: checkbox.value,
+                id: checkbox.dataset.teamId
+            });
+        });
+        
+        if (selectedTeams.length === 0) {
+            throw new Error('Debes seleccionar al menos un equipo');
+        }
+        
+        // Validar formato
+        const validFormats = [4, 8, 16];
+        if (!validFormats.includes(selectedTeams.length)) {
+            throw new Error(`Número de equipos inválido: ${selectedTeams.length}. Debe ser 4, 8 o 16 equipos.`);
+        }
+        
+        const isRoundTrip = document.getElementById('roundTripCheckbox')?.checked || false;
+        
+        const response = await fetch('/api/playoffs/bracket', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                format: selectedTeams.length,
+                teams: selectedTeams,
+                isRoundTrip: isRoundTrip,
+                type: 'custom'
+            })
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `Error ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('✅ Bracket personalizado creado:', data);
+        
+        showNotification(`Bracket personalizado de ${selectedTeams.length} equipos creado correctamente${isRoundTrip ? ' (ida y vuelta)' : ''}`, 'success');
+        
+        // Ocultar selección manual
+        const manualSelection = document.getElementById('manualSelection');
+        if (manualSelection) {
+            manualSelection.style.display = 'none';
+        }
+        
+        // Recargar bracket
+        await loadCurrentBracket();
+        
+    } catch (error) {
+        console.error('❌ Error creando bracket personalizado:', error);
+        showNotification('Error creando bracket personalizado: ' + error.message, 'error');
+    }
+}
+
+async function updatePlayoffMatch(matchId) {
+    console.log(`🏆 Actualizando resultado del partido: ${matchId}`);
+    
+    try {
+        const homeScoreInput = document.getElementById(`homeScore_${matchId}`);
+        const awayScoreInput = document.getElementById(`awayScore_${matchId}`);
+        
+        if (!homeScoreInput || !awayScoreInput) {
+            throw new Error('No se encontraron los campos de resultado');
+        }
+        
+        const homeScore = parseInt(homeScoreInput.value) || 0;
+        const awayScore = parseInt(awayScoreInput.value) || 0;
+        
+        if (homeScore < 0 || awayScore < 0) {
+            throw new Error('Los resultados no pueden ser negativos');
+        }
+        
+        const response = await fetch(`/api/playoffs/bracket/match/${matchId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                homeScore: homeScore,
+                awayScore: awayScore
+            })
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `Error ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('✅ Resultado actualizado:', data);
+        
+        showNotification('Resultado actualizado correctamente', 'success');
+        
+        // Recargar bracket para mostrar cambios
+        await loadCurrentBracket();
+        
+    } catch (error) {
+        console.error('❌ Error actualizando resultado:', error);
+        showNotification('Error actualizando resultado: ' + error.message, 'error');
+    }
+}
+
+// Exponer funciones globalmente
+window.loadPlayoffsManagement = loadPlayoffsManagement;
+window.showManualSelection = showManualSelection;
+window.generateBracket = generateBracket;
+window.createCustomBracket = createCustomBracket;
+window.updatePlayoffMatch = updatePlayoffMatch;
+window.loadCurrentBracket = loadCurrentBracket;
+
+console.log('✅ Funciones de playoffs expuestas globalmente');
 
 async function loadTeamsForSelection() {
     const teamSelection = document.getElementById('teamSelection');
@@ -2134,22 +2940,31 @@ async function generateBracket() {
     const format = document.getElementById('bracketFormat').value;
     const numTeams = parseInt(format);
     
+    // Obtener opción de ida y vuelta
+    const roundTripCheckbox = document.getElementById('roundTripOption');
+    const isRoundTrip = roundTripCheckbox ? roundTripCheckbox.checked : false;
+    
     try {
-        // Obtener tabla de posiciones actual
-        const response = await fetch('/api/standings');
-        if (!response.ok) throw new Error('Error fetching standings');
+        // Obtener equipos disponibles (usar /api/teams que sí existe)
+        const response = await fetch('/api/teams');
+        if (!response.ok) throw new Error('Error fetching teams');
         
-        const standings = await response.json();
+        const teams = await response.json();
+        
+        console.log('🏆 Equipos obtenidos para bracket:', teams);
+        console.log('🔄 Modalidad ida y vuelta:', isRoundTrip ? 'Sí' : 'No');
         
         // Tomar los primeros N equipos según el formato
-        const qualifiedTeams = standings.slice(0, numTeams).map(team => team.team);
+        const qualifiedTeams = teams.slice(0, numTeams);
         
         if (qualifiedTeams.length < numTeams) {
-            showNotification(`Se necesitan al menos ${numTeams} equipos en la tabla`, 'error');
+            showNotification(`Se necesitan al menos ${numTeams} equipos registrados. Tienes ${qualifiedTeams.length}, necesitas ${numTeams}`, 'error');
             return;
         }
         
-        await createBracket(qualifiedTeams, format);
+        console.log('🎯 Equipos clasificados para bracket:', qualifiedTeams);
+        
+        await createBracket(qualifiedTeams, format, isRoundTrip);
         
     } catch (error) {
         console.error('Error generating bracket:', error);
@@ -2219,10 +3034,13 @@ function createCustomPairings(teams) {
     const numTeams = parseInt(format);
     const numMatches = numTeams / 2;
     const customPairings = [];
+    const usedPositions = new Set();
     
     for (let i = 0; i < numMatches; i++) {
         const homePos = parseInt(document.getElementById(`home_${i}`).value);
         const awayPos = parseInt(document.getElementById(`away_${i}`).value);
+        
+        console.log(`🎯 Partido ${i + 1}: Posición local=${homePos}, Posición visitante=${awayPos}`);
         
         if (isNaN(homePos) || isNaN(awayPos) || homePos < 1 || homePos > numTeams || awayPos < 1 || awayPos > numTeams) {
             throw new Error(`Partido ${i + 1}: Posiciones inválidas. Deben ser números entre 1 y ${numTeams}`);
@@ -2232,26 +3050,27 @@ function createCustomPairings(teams) {
             throw new Error(`Partido ${i + 1}: Un equipo no puede jugar contra sí mismo`);
         }
         
+        // Verificar duplicados usando las posiciones originales
+        if (usedPositions.has(homePos)) {
+            throw new Error(`El equipo en posición ${homePos} aparece más de una vez`);
+        }
+        if (usedPositions.has(awayPos)) {
+            throw new Error(`El equipo en posición ${awayPos} aparece más de una vez`);
+        }
+        
+        usedPositions.add(homePos);
+        usedPositions.add(awayPos);
+        
         customPairings.push({
             home: teams[homePos - 1], // -1 porque los arrays empiezan en 0
-            away: teams[awayPos - 1]
+            away: teams[awayPos - 1],
+            homePos: homePos,
+            awayPos: awayPos
         });
     }
     
-    // Verificar que no haya equipos duplicados
-    const usedTeams = new Set();
-    customPairings.forEach((pairing, index) => {
-        if (usedTeams.has(pairing.home)) {
-            throw new Error(`El equipo en posición ${teams.indexOf(pairing.home) + 1} aparece más de una vez`);
-        }
-        if (usedTeams.has(pairing.away)) {
-            throw new Error(`El equipo en posición ${teams.indexOf(pairing.away) + 1} aparece más de una vez`);
-        }
-        usedTeams.add(pairing.home);
-        usedTeams.add(pairing.away);
-    });
-    
-    console.log('🎯 Emparejamientos personalizados creados:', customPairings);
+    console.log('✅ Emparejamientos personalizados creados:', customPairings);
+    console.log('✅ Posiciones usadas:', Array.from(usedPositions).sort((a, b) => a - b));
     return customPairings;
 }
 
@@ -2260,18 +3079,38 @@ async function createCustomBracket() {
     const format = document.getElementById('bracketFormat').value;
     const numTeams = parseInt(format);
     
+    // Obtener opción de ida y vuelta
+    const roundTripCheckbox = document.getElementById('roundTripOption');
+    const isRoundTrip = roundTripCheckbox ? roundTripCheckbox.checked : false;
+    
     try {
-        // Obtener tabla de posiciones actual (igual que generateBracket)
-        const response = await fetch('/api/standings');
-        if (!response.ok) throw new Error('Error fetching standings');
+        // Obtener equipos ordenados por posición en la tabla de posiciones
+        const standingsResponse = await fetch('/api/standings');
+        if (!standingsResponse.ok) {
+            showNotification('Error obteniendo tabla de posiciones', 'error');
+            return;
+        }
         
-        const standings = await response.json();
+        const standings = await standingsResponse.json();
+        console.log('🏆 Tabla de posiciones obtenida:', standings);
         
-        // Tomar los primeros N equipos según el formato
-        const qualifiedTeams = standings.slice(0, numTeams).map(team => team.team);
+        // Ordenar por posición y tomar solo los primeros N equipos
+        const sortedStandings = standings.sort((a, b) => {
+            // Ordenar por puntos (descendente), luego por diferencia de goles (descendente)
+            if (b.points !== a.points) return b.points - a.points;
+            return (b.goalsFor - b.goalsAgainst) - (a.goalsFor - a.goalsAgainst);
+        });
+        
+        // Extraer equipos en orden de posición
+        const qualifiedTeams = sortedStandings.slice(0, parseInt(format)).map(standing => ({
+            name: standing.team || standing.teamName,
+            _id: standing.teamId || standing._id
+        }));
+        
+        console.log('🏆 Equipos calificados en orden de posición:', qualifiedTeams);
         
         if (qualifiedTeams.length < numTeams) {
-            showNotification(`Se necesitan al menos ${numTeams} equipos en la tabla`, 'error');
+            showNotification(`Se necesitan al menos ${numTeams} equipos registrados. Tienes ${qualifiedTeams.length}, necesitas ${numTeams}`, 'error');
             return;
         }
         
@@ -2291,30 +3130,42 @@ async function createCustomBracket() {
             return;
         }
         
-        const bracket = {
+        // Enviar datos en el formato que espera el backend
+        const requestData = {
             format: format,
-            teams: qualifiedTeams,
-            matches: generateBracketMatches(qualifiedTeams, format, customPairings),
-            createdAt: new Date().toISOString()
+            selectedTeams: qualifiedTeams,  // Backend espera "selectedTeams"
+            customPairings: customPairings,  // Incluir emparejamientos personalizados
+            isRoundTrip: isRoundTrip  // Incluir opción de ida y vuelta
         };
+        
+        console.log('🎯 Enviando bracket personalizado al backend:', requestData);
+        console.log('🔄 Modalidad ida y vuelta:', isRoundTrip ? 'Sí' : 'No');
         
         const bracketResponse = await fetch('/api/playoffs/bracket', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify(bracket)
+            body: JSON.stringify(requestData)
         });
         
         if (bracketResponse.ok) {
+            const result = await bracketResponse.json();
+            const bracket = result.bracket;
+            
+            console.log('✅ Bracket personalizado creado exitosamente:', bracket);
+            
             currentBracket = bracket;
             renderBracket(bracket);
             showNotification('Bracket personalizado creado exitosamente', 'success');
             
             // Ocultar selección manual
             document.getElementById('manualSelection').style.display = 'none';
+            document.getElementById('customPairings').style.display = 'none';
         } else {
-            showNotification('Error creando bracket personalizado', 'error');
+            const errorData = await bracketResponse.json();
+            console.error('❌ Error del servidor:', errorData);
+            showNotification(`Error creando bracket personalizado: ${errorData.error || 'Error desconocido'}`, 'error');
         }
         
     } catch (error) {
@@ -2323,13 +3174,16 @@ async function createCustomBracket() {
     }
 }
 
-async function createBracket(teams, format) {
-    const bracket = {
+async function createBracket(teams, format, isRoundTrip = false) {
+    // Enviar datos en el formato que espera el backend
+    const requestData = {
         format: format,
-        teams: teams,
-        matches: generateBracketMatches(teams, format),
-        createdAt: new Date().toISOString()
+        selectedTeams: teams,  // Backend espera "selectedTeams", no "teams"
+        isRoundTrip: isRoundTrip  // Incluir opción de ida y vuelta
     };
+    
+    console.log('🏆 Enviando datos al backend:', requestData);
+    console.log('🔄 Modalidad ida y vuelta:', isRoundTrip ? 'Sí' : 'No');
     
     try {
         const response = await fetch('/api/playoffs/bracket', {
@@ -2337,10 +3191,15 @@ async function createBracket(teams, format) {
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify(bracket)
+            body: JSON.stringify(requestData)
         });
         
         if (response.ok) {
+            const result = await response.json();
+            const bracket = result.bracket;
+            
+            console.log('✅ Bracket creado exitosamente:', bracket);
+            
             currentBracket = bracket;
             renderBracket(bracket);
             showNotification('Bracket creado exitosamente', 'success');
@@ -2348,7 +3207,9 @@ async function createBracket(teams, format) {
             // Ocultar selección manual
             document.getElementById('manualSelection').style.display = 'none';
         } else {
-            showNotification('Error creando bracket', 'error');
+            const errorData = await response.json();
+            console.error('❌ Error del servidor:', errorData);
+            showNotification(`Error creando bracket: ${errorData.error || 'Error desconocido'}`, 'error');
         }
     } catch (error) {
         console.error('Error creating bracket:', error);
@@ -2503,16 +3364,40 @@ function generateBracketMatches(teams, format, customPairings = null) {
 // Función auxiliar para obtener el nombre de la ronda
 function getRoundName(round, format) {
     const roundNum = parseInt(round);
-    const totalRounds = Math.log2(parseInt(format)) + 1;
+    const numTeams = parseInt(format);
     
-    switch (totalRounds - roundNum) {
-        case 0: return 'Final';
-        case 1: return 'Semifinales';
-        case 2: return 'Cuartos de Final';
-        case 3: return 'Octavos de Final';
-        case 4: return 'Dieciseisavos de Final';
-        default: return `Ronda ${roundNum}`;
+    // Lógica corregida para nomenclatura correcta
+    if (numTeams === 4) {
+        switch (roundNum) {
+            case 1: return 'Semifinales';
+            case 2: return 'Final';
+            default: return `Ronda ${roundNum}`;
+        }
+    } else if (numTeams === 8) {
+        switch (roundNum) {
+            case 1: return 'Cuartos de Final';
+            case 2: return 'Semifinales';
+            case 3: return 'Final';
+            default: return `Ronda ${roundNum}`;
+        }
+    } else if (numTeams === 16) {
+        switch (roundNum) {
+            case 1: return 'Octavos de Final';
+            case 2: return 'Cuartos de Final';
+            case 3: return 'Semifinales';
+            case 4: return 'Final';
+            default: return `Ronda ${roundNum}`;
+        }
     }
+    
+    // Fallback para otros formatos
+    const totalRounds = Math.log2(numTeams);
+    if (roundNum === totalRounds) return 'Final';
+    if (roundNum === totalRounds - 1) return 'Semifinales';
+    if (roundNum === totalRounds - 2) return 'Cuartos de Final';
+    if (roundNum === totalRounds - 3) return 'Octavos de Final';
+    
+    return `Ronda ${roundNum}`;
 }
 
 function renderBracket(bracket) {
@@ -2876,22 +3761,15 @@ window.updatePlayerStats = async function updatePlayerStats(playerId, statType, 
             return;
         }
         
-        // Encontrar el jugador en el array local (comparar tanto string como number)
-        let playerIndex = players.findIndex(p => p.id === playerId);
-        
-        // Si no se encuentra, intentar con conversión de tipos
-        if (playerIndex === -1) {
-            playerIndex = players.findIndex(p => p.id == playerId); // Comparación flexible
-        }
-        
-        // Si aún no se encuentra, intentar con conversión a número
-        if (playerIndex === -1) {
-            const numPlayerId = parseInt(playerId);
-            playerIndex = players.findIndex(p => p.id === numPlayerId);
-        }
+        // Encontrar el jugador en el array local usando _id o id
+        let playerIndex = players.findIndex(p => {
+            const playerIdToCompare = p._id || p.id;
+            return playerIdToCompare === playerId || playerIdToCompare == playerId;
+        });
         
         if (playerIndex === -1) {
-            console.error('❌ Jugador no encontrado. IDs disponibles:', players.map(p => `${p.id} (${typeof p.id})`));
+            console.error('❌ Jugador no encontrado con ID:', playerId);
+            console.error('❌ IDs disponibles:', players.map(p => ({ id: p._id || p.id, name: p.name })));
             showNotification('Jugador no encontrado', 'error');
             return;
         }
@@ -2902,26 +3780,36 @@ window.updatePlayerStats = async function updatePlayerStats(playerId, statType, 
         const oldValue = players[playerIndex][statType] || 0;
         players[playerIndex][statType] = numValue;
         
-        // Actualizar en el backend
+        // Actualizar en el backend - solo enviar el campo específico
+        const updateData = {
+            [statType]: numValue
+        };
+        
+        console.log('📤 Enviando actualización al backend:', updateData);
+        
         const response = await fetch(`/api/players/${playerId}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                ...players[playerIndex],
-                [statType]: numValue
-            })
+            body: JSON.stringify(updateData)
         });
         
         if (response.ok) {
-            const updatedPlayer = await response.json();
+            const responseData = await response.json();
+            const updatedPlayer = responseData.player || responseData;
             players[playerIndex] = updatedPlayer;
             
+            console.log('✅ Respuesta del backend:', responseData);
+            console.log('🔄 Jugador actualizado:', updatedPlayer);
+            
             // Actualizar también el array de teamPlayers si es necesario
-            const teamPlayerIndex = teamPlayers.findIndex(p => p.id === playerId);
+            const teamPlayerIndex = teamPlayers.findIndex(p => {
+                const playerIdToCompare = p._id || p.id;
+                return playerIdToCompare === playerId || playerIdToCompare == playerId;
+            });
             if (teamPlayerIndex !== -1) {
-                teamPlayers[teamPlayerIndex] = updatedPlayer;
+                teamPlayers[teamPlayerIndex] = updatedPlayer.player || updatedPlayer;
             }
             
             console.log(`✅ ${statType} actualizado: ${oldValue} → ${numValue}`);
@@ -2956,7 +3844,10 @@ window.updatePlayerStats = async function updatePlayerStats(playerId, statType, 
         showNotification('Error actualizando estadísticas', 'error');
         
         // Revertir cambio local
-        const playerIndex = players.findIndex(p => p.id === playerId);
+        const playerIndex = players.findIndex(p => {
+            const playerIdToCompare = p._id || p.id;
+            return playerIdToCompare === playerId || playerIdToCompare == playerId;
+        });
         if (playerIndex !== -1) {
             // Revertir el input
             const input = document.querySelector(`input[onchange*="updatePlayerStats('${playerId}', '${statType}'"]`);
@@ -2968,7 +3859,7 @@ window.updatePlayerStats = async function updatePlayerStats(playerId, statType, 
 }
 
 // Make functions globally available
-window.deleteTeam = deleteTeam;
+// window.deleteTeam ya está definido al inicio del archivo
 window.editClub = editClub;
 window.deleteClub = deleteClub;
 window.updatePlayerStats = updatePlayerStats;
@@ -3264,7 +4155,7 @@ window.deletePlayerQuick = deletePlayerQuick;
 window.editPlayerQuick = editPlayerQuick;
 
 // Funciones de equipos
-window.deleteTeam = deleteTeam;
+// window.deleteTeam ya está definido al inicio del archivo
 window.editTeam = editTeam;
 window.cancelTeamEdit = cancelTeamEdit;
 
@@ -3929,6 +4820,15 @@ function forceRenderTeams() {
     teams.forEach((team, index) => {
         console.log(`🏆 Renderizando equipo ${index + 1}:`, team.name);
         
+        // Asegurarse de que el equipo tenga un ID válido
+        const teamId = team._id || team.id;
+        if (!teamId) {
+            console.error(`❌ ERROR: El equipo "${team.name}" no tiene ID válido`, team);
+            return; // Saltar este equipo si no tiene ID
+        }
+        
+        console.log(`🆔 Equipo ID: ${teamId}`);
+        
         const teamCard = document.createElement('div');
         teamCard.style.cssText = `
             background: rgba(255, 255, 255, 0.05);
@@ -3950,12 +4850,13 @@ function forceRenderTeams() {
             </div>
             <div style="flex: 1;">
                 <h3 style="color: #00ff88; margin: 0; font-size: 18px;">${team.name}</h3>
+                <small style="color: rgba(255,255,255,0.5);">ID: ${teamId}</small>
             </div>
             <div style="display: flex; gap: 10px;">
-                <button onclick="editTeam(${team.id})" style="background: linear-gradient(45deg, #3498db, #2980b9); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px;">
+                <button onclick="window.editTeam('${teamId}')" style="background: linear-gradient(45deg, #3498db, #2980b9); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px;">
                     <i class="fas fa-edit"></i> Editar
                 </button>
-                <button onclick="deleteTeam(${team.id})" style="background: linear-gradient(45deg, #e74c3c, #c0392b); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px;">
+                <button onclick="window.deleteTeam('${teamId}', event)" data-team-id="${teamId}" style="background: linear-gradient(45deg, #e74c3c, #c0392b); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px;">
                     <i class="fas fa-trash"></i> Eliminar
                 </button>
             </div>
@@ -3971,7 +4872,7 @@ window.switchTab = switchTab;
 window.logout = logout;
 window.forceRenderTeams = forceRenderTeams;
 
-// Función simple y directa para agregar botones
+// Función para agregar botones de edición/eliminación a las tarjetas de equipos
 function addEditButtonsToTeams() {
     console.log('🔧 INICIANDO: addEditButtonsToTeams');
     
@@ -3983,63 +4884,38 @@ function addEditButtonsToTeams() {
     
     console.log('🔧 teamsGrid encontrado:', teamsGrid);
     
-    // Buscar todas las tarjetas de equipos existentes
-    const teamCards = teamsGrid.children;
-    console.log('🔧 Tarjetas encontradas:', teamCards.length);
+    // No necesitamos agregar botones manualmente ya que ya están en el HTML generado
+    // Solo verificamos que los botones funcionen correctamente
     
-    if (teamCards.length === 0) {
-        console.log('⚠️ No hay tarjetas de equipos');
-        return;
-    }
+    // Buscar todos los botones de eliminar existentes
+    const deleteButtons = document.querySelectorAll('button[onclick^="window.deleteTeam"]');
+    console.log('🔍 Botones de eliminar encontrados:', deleteButtons.length);
     
-    // Agregar botones a cada tarjeta
-    for (let i = 0; i < teamCards.length; i++) {
-        const card = teamCards[i];
-        console.log(`🔧 Procesando tarjeta ${i + 1}`);
-        
-        // Verificar si ya tiene botones
-        if (card.querySelector('.edit-buttons')) {
-            console.log(`ℹ️ Tarjeta ${i + 1} ya tiene botones`);
-            continue;
+    // Verificar que los botones tengan el ID correcto
+    deleteButtons.forEach((btn, index) => {
+        const onclickAttr = btn.getAttribute('onclick');
+        if (!onclickAttr || !onclickAttr.includes('deleteTeam')) {
+            console.warn(`⚠️ Botón ${index} no tiene el manejador correcto`);
+            return;
         }
         
-        // Crear contenedor de botones
-        const buttonsDiv = document.createElement('div');
-        buttonsDiv.className = 'edit-buttons';
-        buttonsDiv.style.cssText = 'display: flex !important; gap: 10px; margin-top: 15px; padding: 10px; background: rgba(255,0,0,0.1); border: 2px solid red; width: 100%; box-sizing: border-box; position: relative; z-index: 9999;';
+        // Extraer el ID del equipo del atributo onclick
+        const match = onclickAttr.match(/deleteTeam\('?([^')]*)'?\)/);
+        if (!match || !match[1]) {
+            console.warn(`⚠️ No se pudo extraer el ID del equipo del botón ${index}`);
+            return;
+        }
         
-        // Botón Editar
-        const editBtn = document.createElement('button');
-        editBtn.innerHTML = '<i class="fas fa-edit"></i> Editar';
-        editBtn.style.cssText = 'background: linear-gradient(45deg, #3498db, #2980b9); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px;';
-        editBtn.onclick = function() {
-            alert('Botón Editar funciona! (Equipo ' + (i + 1) + ')');
-        };
-        
-        // Botón Eliminar
-        const deleteBtn = document.createElement('button');
-        deleteBtn.innerHTML = '<i class="fas fa-trash"></i> Eliminar';
-        deleteBtn.style.cssText = 'background: linear-gradient(45deg, #e74c3c, #c0392b); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px;';
-        deleteBtn.onclick = function() {
-            alert('Botón Eliminar funciona! (Equipo ' + (i + 1) + ')');
-        };
-        
-        // Agregar botones al contenedor
-        buttonsDiv.appendChild(editBtn);
-        buttonsDiv.appendChild(deleteBtn);
-        
-        // Agregar contenedor a la tarjeta
-        card.appendChild(buttonsDiv);
-        
-        console.log(`✅ Botones agregados a tarjeta ${i + 1}`);
-    }
+        const teamId = match[1];
+        console.log(`✅ Botón ${index} vinculado correctamente al equipo ID: ${teamId}`);
+    });
     
-    console.log('✅ COMPLETADO: addEditButtonsToTeams');
+    console.log('✅ VERIFICACIÓN DE BOTONES COMPLETADA');
 }
 
 // Funciones de equipos
 window.editTeam = editTeam;
-window.deleteTeam = deleteTeam;
+// window.deleteTeam ya está definido al inicio del archivo
 window.cancelTeamEdit = cancelTeamEdit;
 window.addEditButtonsToTeams = addEditButtonsToTeams;
 
@@ -4086,4 +4962,390 @@ window.cleanupMongoDB = async function() {
     }
 };
 
+// Exponer funciones de clubes globalmente
+window.editClub = editClub;
+window.deleteClub = deleteClub;
+window.cancelClubEdit = cancelClubEdit;
+
+// Exponer funciones de jugadores globalmente
+window.deletePlayerQuick = deletePlayerQuick;
+window.editPlayerQuick = editPlayerQuick;
+window.updatePlayerStats = updatePlayerStats;
+
+// ==================== FUNCIONES DE RENDERIZADO PARA TIEMPO REAL ====================
+
+// Función para renderizar clubes automáticamente
+function renderClubs() {
+    console.log('🏢 RENDERIZANDO CLUBES EN TIEMPO REAL...');
+    const clubsGrid = document.getElementById('clubsGrid');
+    if (!clubsGrid) {
+        console.warn('⚠️ clubsGrid no encontrado');
+        return;
+    }
+    
+    if (!clubs || clubs.length === 0) {
+        clubsGrid.innerHTML = '<p style="text-align: center; color: #666; margin: 20px;">No hay clubes registrados</p>';
+        return;
+    }
+    
+    clubsGrid.innerHTML = clubs.map(club => `
+        <div class="team-card">
+            <div class="team-logo">
+                <img src="${club.logo || '/images/default-logo.png'}" alt="${club.name}" onerror="this.src='/images/default-logo.png'">
+            </div>
+            <div class="team-info">
+                <h3>${club.name}</h3>
+                <p><strong>Fundado:</strong> ${club.founded || 'N/A'}</p>
+                <p><strong>Jugadores:</strong> ${club.players || 0}</p>
+                <p><strong>Descripción:</strong> ${club.description || 'Sin descripción'}</p>
+            </div>
+            <div class="team-actions">
+                <button class="btn-edit" onclick="window.editClub('${club._id || club.id}')">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button class="btn-delete" onclick="window.deleteClub('${club._id || club.id}')">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        </div>
+    `).join('');
+    
+    console.log('✅ Clubes renderizados:', clubs.length);
+}
+
+// Función para renderizar partidos automáticamente
+function renderMatches() {
+    console.log('⚽ RENDERIZANDO PARTIDOS EN TIEMPO REAL...');
+    const matchesGrid = document.getElementById('matchesGrid');
+    if (!matchesGrid) {
+        console.warn('⚠️ matchesGrid no encontrado');
+        return;
+    }
+    
+    if (!matches || matches.length === 0) {
+        matchesGrid.innerHTML = '<p style="text-align: center; color: #666; margin: 20px;">No hay partidos programados</p>';
+        return;
+    }
+    
+    matchesGrid.innerHTML = matches.map(match => {
+        const matchDate = new Date(match.date);
+        const formattedDate = matchDate.toLocaleDateString('es-ES');
+        const formattedTime = match.time || '00:00';
+        
+        return `
+            <div class="match-card">
+                <div class="match-header">
+                    <span class="match-date">${formattedDate}</span>
+                    <span class="match-time">${formattedTime}</span>
+                </div>
+                <div class="match-teams">
+                    <div class="team-home">
+                        <span class="team-name">${match.homeTeam}</span>
+                        ${match.homeScore !== null ? `<span class="score">${match.homeScore}</span>` : ''}
+                    </div>
+                    <div class="vs">VS</div>
+                    <div class="team-away">
+                        ${match.awayScore !== null ? `<span class="score">${match.awayScore}</span>` : ''}
+                        <span class="team-name">${match.awayTeam}</span>
+                    </div>
+                </div>
+                <div class="match-status">
+                    <span class="status ${match.status}">${match.status === 'scheduled' ? 'Programado' : match.status === 'live' ? 'En vivo' : 'Finalizado'}</span>
+                    ${match.round ? `<span class="round">Jornada ${match.round}</span>` : ''}
+                </div>
+                <div class="match-actions">
+                    <button class="btn-edit" onclick="editMatch('${match._id || match.id}')">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn-delete" onclick="deleteMatch('${match._id || match.id}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    console.log('✅ Partidos renderizados:', matches.length);
+}
+
+// Función para cargar pestañas de equipos automáticamente
+function loadTeamTabs() {
+    console.log('🏆 CARGANDO PESTAÑAS DE EQUIPOS EN TIEMPO REAL...');
+    const teamTabs = document.getElementById('teamTabs');
+    if (!teamTabs) {
+        console.warn('⚠️ teamTabs no encontrado');
+        return;
+    }
+    
+    if (!teams || teams.length === 0) {
+        teamTabs.innerHTML = '<p style="text-align: center; color: #666; margin: 20px;">No hay equipos para mostrar jugadores</p>';
+        return;
+    }
+    
+    teamTabs.innerHTML = teams.map((team, index) => `
+        <button class="team-tab ${index === 0 ? 'active' : ''}" 
+                data-team-id="${team._id || team.id}" 
+                onclick="selectTeamTab('${team._id || team.id}')">
+            ${team.name}
+        </button>
+    `).join('');
+    
+    // Cargar jugadores del primer equipo automáticamente
+    if (teams.length > 0) {
+        const firstTeamId = teams[0]._id || teams[0].id;
+        loadTeamPlayers(firstTeamId);
+    }
+    
+    console.log('✅ Pestañas de equipos cargadas:', teams.length);
+}
+
+// ==================== FUNCIONES DE PARTIDOS ====================
+
+// Función para editar partido
+function editMatch(matchId) {
+    console.log('✏️ EDITANDO PARTIDO:', matchId);
+    const match = matches.find(m => (m._id || m.id) === matchId);
+    if (!match) {
+        console.error('❌ Partido no encontrado:', matchId);
+        return;
+    }
+    
+    // Aquí puedes implementar la lógica de edición
+    // Por ejemplo, abrir un modal o formulario de edición
+    console.log('📝 Partido a editar:', match);
+    alert(`Función de edición para el partido: ${match.homeTeam} vs ${match.awayTeam}\n\nEsta funcionalidad se puede implementar según tus necesidades.`);
+}
+
+// Función para eliminar partido
+function deleteMatch(matchId) {
+    console.log('🗑️ ELIMINANDO PARTIDO:', matchId);
+    
+    if (!confirm('¿Estás seguro de que quieres eliminar este partido?')) {
+        return;
+    }
+    
+    fetch(`/api/matches/${matchId}`, {
+        method: 'DELETE'
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('✅ Partido eliminado exitosamente:', data);
+        showNotification('Partido eliminado exitosamente', 'success');
+        // No necesitamos recargar manualmente - el WebSocket se encarga
+    })
+    .catch(error => {
+        console.error('❌ Error eliminando partido:', error);
+        showNotification('Error eliminando partido', 'error');
+    });
+}
+
+// ==================== CONFIGURACIÓN DE ZONAS DE CLASIFICACIÓN ====================
+
+// Función para guardar configuración de zonas de clasificación
+async function saveTableConfig() {
+    try {
+        console.log('🎯 INICIANDO GUARDADO DE ZONAS DE CLASIFICACIÓN...');
+        
+        // Obtener todas las zonas de clasificación del contenedor correcto
+        const zonesContainer = document.getElementById('classificationZones');
+        if (!zonesContainer) {
+            console.error('❌ No se encontró el contenedor classificationZones');
+            showNotification('Error: No se encontró el contenedor de zonas', 'error');
+            return;
+        }
+        
+        const zoneElements = zonesContainer.querySelectorAll('.zone-config');
+        const classificationZones = [];
+        
+        console.log('🔍 Elementos de zona encontrados:', zoneElements.length);
+        
+        zoneElements.forEach((zoneElement, index) => {
+            const nameInput = zoneElement.querySelector('input[type="text"]');
+            const positionsInput = zoneElement.querySelector('input[placeholder*="1-4"], input[placeholder*="posici"]');
+            const colorInput = zoneElement.querySelector('input[type="color"]');
+            
+            console.log(`🔍 Zona ${index + 1}:`, {
+                nameInput: nameInput?.value,
+                positionsInput: positionsInput?.value,
+                colorInput: colorInput?.value
+            });
+            
+            if (nameInput && positionsInput && colorInput) {
+                classificationZones.push({
+                    id: index + 1,
+                    name: nameInput.value.trim(),
+                    positions: positionsInput.value.trim(),
+                    color: colorInput.value
+                });
+            }
+        });
+        
+        console.log('📋 Zonas de clasificación a guardar:', classificationZones);
+        
+        if (classificationZones.length === 0) {
+            showNotification('No hay zonas de clasificación para guardar', 'warning');
+            return;
+        }
+        
+        // Validar que todos los campos estén completos
+        for (const zone of classificationZones) {
+            if (!zone.name || !zone.positions || !zone.color) {
+                showNotification('Todos los campos son obligatorios', 'error');
+                return;
+            }
+        }
+        
+        // Enviar al backend
+        const response = await fetch('/api/settings/classification-zones', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ classificationZones })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            console.log('✅ Zonas de clasificación guardadas exitosamente:', data);
+            showNotification('Configuración guardada correctamente', 'success');
+        } else {
+            throw new Error(data.error || 'Error desconocido');
+        }
+        
+    } catch (error) {
+        console.error('❌ Error saving classification zones:', error);
+        showNotification('Error guardando configuración: ' + error.message, 'error');
+    }
+}
+
+// Función para cargar configuración de zonas de clasificación
+async function loadTableConfig() {
+    try {
+        console.log('🔄 CARGANDO CONFIGURACIÓN DE ZONAS...');
+        
+        const response = await fetch('/api/settings/classification-zones');
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.success && data.classificationZones) {
+            console.log('✅ Configuración cargada:', data.classificationZones);
+            renderTableConfig(data.classificationZones);
+        } else {
+            throw new Error(data.error || 'Error desconocido');
+        }
+        
+    } catch (error) {
+        console.error('❌ Error loading classification zones:', error);
+        showNotification('Error cargando configuración: ' + error.message, 'error');
+    }
+}
+
+// Función para renderizar la configuración en el contenedor correcto
+function renderTableConfig(zones) {
+    const container = document.getElementById('classificationZones');
+    if (!container) {
+        console.error('❌ No se encontró classificationZones');
+        return;
+    }
+    
+    container.innerHTML = '';
+    
+    zones.forEach((zone, index) => {
+        const zoneDiv = document.createElement('div');
+        zoneDiv.className = 'zone-config';
+        zoneDiv.style.cssText = `
+            display: grid;
+            grid-template-columns: 2fr 1fr 100px;
+            gap: 15px;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        `;
+        
+        zoneDiv.innerHTML = `
+            <input type="text" value="${zone.name}" placeholder="Nombre de la zona" 
+                   style="background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.3); color: white; padding: 8px; border-radius: 4px;">
+            <input type="text" value="${zone.positions}" placeholder="1-4" 
+                   style="background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.3); color: white; padding: 8px; border-radius: 4px;">
+            <input type="color" value="${zone.color}" 
+                   style="width: 50px; height: 35px; border: none; border-radius: 4px; cursor: pointer;">
+        `;
+        
+        container.appendChild(zoneDiv);
+    });
+    
+    console.log('✅ Configuración renderizada en el contenedor:', zones.length, 'zonas');
+}
+
+// Función para agregar una nueva zona de clasificación
+function addClassificationZone() {
+    const container = document.getElementById('classificationZones');
+    if (!container) {
+        console.error('❌ No se encontró classificationZones');
+        return;
+    }
+    
+    const zoneDiv = document.createElement('div');
+    zoneDiv.className = 'zone-config';
+    zoneDiv.style.cssText = `
+        display: grid;
+        grid-template-columns: 2fr 1fr 100px 40px;
+        gap: 15px;
+        align-items: center;
+        background: rgba(255, 255, 255, 0.1);
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 10px;
+    `;
+    
+    zoneDiv.innerHTML = `
+        <input type="text" placeholder="Nombre de la zona" 
+               style="background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.3); color: white; padding: 8px; border-radius: 4px;">
+        <input type="text" placeholder="1-4" 
+               style="background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.3); color: white; padding: 8px; border-radius: 4px;">
+        <input type="color" value="#00ff88" 
+               style="width: 50px; height: 35px; border: none; border-radius: 4px; cursor: pointer;">
+        <button onclick="this.parentElement.remove()" 
+                style="background: #ff4757; border: none; color: white; padding: 8px; border-radius: 4px; cursor: pointer;">
+            <i class="fas fa-trash"></i>
+        </button>
+    `;
+    
+    container.appendChild(zoneDiv);
+    console.log('✅ Nueva zona de clasificación agregada');
+}
+
+// Función para cargar configuración automáticamente al inicializar
+function initializeClassificationZones() {
+    // Cargar configuración existente al inicializar el admin
+    if (document.getElementById('classificationZones')) {
+        loadTableConfig();
+    }
+}
+
+// Exponer funciones globalmente
+window.saveTableConfig = saveTableConfig;
+window.loadTableConfig = loadTableConfig;
+window.addClassificationZone = addClassificationZone;
+
 console.log('✅ Funciones globales expuestas correctamente');
+
+// Inicializar zonas de clasificación automáticamente
+// REMOVIDO: setTimeout para evitar timing inconsistente
+// Las zonas se cargarán cuando se acceda a la pestaña config

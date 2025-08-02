@@ -134,14 +134,15 @@ function renderClubSelector() {
 
     // Agregar botones para cada club que tenga jugadores
     const clubsWithPlayers = allClubs.filter(club => 
-        allPlayers.some(player => player.clubId === club.id)
+        allPlayers.some(player => player.clubName === club.name || player.team === club._id)
     );
 
     clubsWithPlayers.forEach(club => {
-        const playerCount = allPlayers.filter(p => p.clubId === club.id).length;
+        const playerCount = allPlayers.filter(p => p.clubName === club.name || p.team === club._id).length;
         const btn = document.createElement('button');
-        btn.className = `club-btn ${currentClubId == club.id ? 'active' : ''}`;
-        btn.setAttribute('data-club', club.id);
+        const clubId = club._id || club.id;
+        btn.className = `club-btn ${currentClubId == clubId ? 'active' : ''}`;
+        btn.setAttribute('data-club', clubId);
         btn.innerHTML = `
             <i class="fas fa-shield-alt"></i> ${club.name}
             <span style="background: rgba(255,255,255,0.2); padding: 2px 6px; border-radius: 10px; font-size: 12px; margin-left: 8px;">
@@ -178,8 +179,11 @@ function updateClubInfo() {
         return;
     }
     
-    const club = allClubs.find(c => c.id == currentClubId);
-    const clubPlayers = allPlayers.filter(p => p.clubId == currentClubId);
+    const club = allClubs.find(c => c.id == currentClubId || c._id == currentClubId);
+    const clubPlayers = allPlayers.filter(p => {
+        if (!club) return false;
+        return p.clubName === club.name || p.team === club._id;
+    });
     
     if (!club) {
         clubInfo.style.display = 'none';
@@ -202,7 +206,13 @@ function renderPlayers() {
     // Filter players based on selected club
     let playersToShow = currentClubId === 'all' 
         ? allPlayers 
-        : allPlayers.filter(p => p.clubId == currentClubId);
+        : allPlayers.filter(p => {
+            // Buscar el club seleccionado
+            const selectedClub = allClubs.find(club => club.id == currentClubId || club._id == currentClubId);
+            if (!selectedClub) return false;
+            // Filtrar por nombre del club o ID del equipo
+            return p.clubName === selectedClub.name || p.team === selectedClub._id;
+        });
 
     // Sort players by number
     playersToShow.sort((a, b) => a.number - b.number);

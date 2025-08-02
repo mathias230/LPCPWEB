@@ -129,18 +129,12 @@
                         </table>
                     </div>
 
-                    <div class="table-legend">
-                        <div class="legend-item">
-                            <span class="legend-color champions"></span>
-                            <span>Líder (1º)</span>
-                        </div>
-                        <div class="legend-item">
-                            <span class="legend-color playoffs"></span>
-                            <span>Clasifican a Playoffs (1º-8º)</span>
-                        </div>
-                        <div class="legend-item">
-                            <span class="legend-color relegation"></span>
-                            <span>Eliminados (9º-10º)</span>
+                    <!-- Leyenda Dinámica de Zonas de Clasificación -->
+                    <div class="table-legend" id="classificationLegend">
+                        <!-- Las zonas de clasificación se cargarán dinámicamente aquí -->
+                        <div class="legend-loading">
+                            <i class="fas fa-spinner fa-spin"></i>
+                            <span>Cargando zonas de clasificación...</span>
                         </div>
                     </div>
                 </div>

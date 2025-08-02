@@ -571,11 +571,37 @@
             justify-content: flex-end;
         }
 
-        .btn-delete {
-            background: linear-gradient(45deg, #ff4757, #ff3838);
+        .btn-edit {
+            background: linear-gradient(45deg, #3498db, #2980b9);
             color: white;
-            padding: 8px 16px;
             border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-edit:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+        }
+        
+        .btn-delete {
+            background: linear-gradient(45deg, #e74c3c, #c0392b);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
             border-radius: 6px;
             cursor: pointer;
             font-size: 14px;
@@ -710,22 +736,7 @@
             </form>
 
             <div class="teams-grid" id="teamsGrid">
-                <!-- Teams will be loaded here dynamically, but here are some examples -->
-                <div class="team-card">
-                    <div class="team-name">Equipo de Prueba</div>
-                    <p style="color: rgba(255,255,255,0.7);">ID: 1</p>
-                    <div style="margin-top: 15px;">
-                        <button onclick="editTeam(1)" style="background: linear-gradient(45deg, #3498db, #2980b9); color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; margin-right: 10px;">
-                            <i class="fas fa-edit"></i> Editar
-                        </button>
-                        <button onclick="deleteTeam(1)" style="background: linear-gradient(45deg, #e74c3c, #c0392b); color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer;">
-                            <i class="fas fa-trash"></i> Eliminar
-                        </button>
-                        <button onclick="alert('¡JavaScript SÍ funciona!')" style="background: linear-gradient(45deg, #f39c12, #e67e22); color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; margin-left: 10px;">
-                            <i class="fas fa-test"></i> Prueba
-                        </button>
-                    </div>
-                </div>
+                <!-- Teams will be loaded here dynamically -->
             </div>
         </div>
 
@@ -1053,6 +1064,74 @@
             
             <!-- Resultados de verificación -->
             <div id="verificationResults" style="display: none;"></div>
+        </div>
+
+        <!-- Playoffs Section -->
+        <div class="admin-section" id="playoffs">
+            <h2><i class="fas fa-medal"></i> Gestión de Playoffs</h2>
+            
+            <p style="color: rgba(255,255,255,0.7); margin-bottom: 20px;">Genera y gestiona los brackets de eliminatorias del torneo</p>
+            
+            <!-- Configuración del Bracket -->
+            <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+                <h3 style="color: #00ff88; margin-bottom: 15px;"><i class="fas fa-cog"></i> Configuración del Bracket</h3>
+                
+                <div class="form-group">
+                    <label for="bracketFormat">Formato del Bracket</label>
+                    <select id="bracketFormat">
+                        <option value="4">4 equipos (Semifinales)</option>
+                        <option value="8">8 equipos (Cuartos de Final)</option>
+                        <option value="16">16 equipos (Octavos de Final)</option>
+                    </select>
+                </div>
+                
+                <!-- Opción de Ida y Vuelta -->
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label style="display: flex; align-items: center; color: #00ff88; cursor: pointer; font-weight: 600;">
+                        <input type="checkbox" id="roundTripOption" style="margin-right: 10px; transform: scale(1.2);">
+                        <i class="fas fa-exchange-alt" style="margin-right: 8px;"></i>
+                        Modalidad Ida y Vuelta
+                    </label>
+                    <small style="color: rgba(255,255,255,0.6); margin-top: 5px; display: block; margin-left: 30px;">
+                        Cada eliminatoria se jugará en dos partidos: uno de ida y otro de vuelta
+                    </small>
+                </div>
+                
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button type="button" class="btn" onclick="generateBracket()">
+                        <i class="fas fa-random"></i> Generar Bracket Automático
+                    </button>
+                    
+                    <button type="button" class="btn" onclick="showManualSelection()" style="background: linear-gradient(45deg, #ffa502, #ff6348);">
+                        <i class="fas fa-hand-paper"></i> Selección Manual
+                    </button>
+                    
+                    <button type="button" class="btn" onclick="loadCurrentBracket()" style="background: linear-gradient(45deg, #3742fa, #2f3542);">
+                        <i class="fas fa-eye"></i> Ver Bracket Actual
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Selección Manual de Equipos -->
+            <div id="manualSelection" style="display: none; background: rgba(255,255,255,0.05); padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+                <h3 style="color: #00ff88; margin-bottom: 15px;"><i class="fas fa-hand-paper"></i> Selección Manual de Equipos</h3>
+                
+                <div id="teamSelection" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 20px;">
+                    <!-- Team checkboxes will be loaded here -->
+                </div>
+                
+                <button type="button" class="btn" onclick="createCustomBracket()">
+                    <i class="fas fa-check"></i> Crear Bracket con Equipos Seleccionados
+                </button>
+            </div>
+            
+            <!-- Visualización del Bracket -->
+            <div id="bracketDisplay" style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 10px;">
+                <h3 style="color: #00ff88; margin-bottom: 15px;"><i class="fas fa-trophy"></i> Bracket Actual</h3>
+                <div id="bracketContainer">
+                    <p style="color: rgba(255,255,255,0.6); text-align: center; padding: 40px;">No hay bracket generado. Usa los botones de arriba para crear uno.</p>
+                </div>
+            </div>
         </div>
 
     </div>

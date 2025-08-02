@@ -1,7 +1,19 @@
 {
-  "teams": [],
+  "teams": [
+    {
+      "id": 1754149361144,
+      "name": "ss",
+      "logo": "img/default-team.png"
+    }
+  ],
   "tournament": {
-    "teams": [],
+    "teams": [
+      {
+        "id": 1754149361144,
+        "name": "ss",
+        "logo": "img/default-team.png"
+      }
+    ],
     "matches": [],
     "standings": [],
     "settings": {
@@ -34,5 +46,5 @@
     "total_views": 4,
     "total_likes": 0
   },
-  "lastQuickSave": "2025-08-02T06:00:05.580Z"
+  "lastQuickSave": "2025-08-02T16:30:50.227Z"
 }
