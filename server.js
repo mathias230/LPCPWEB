@@ -250,7 +250,15 @@ async function loadTournamentData() {
         try {
             await loadFromMongoDB();
             console.log('✅ Datos cargados exitosamente desde MongoDB');
-            return;
+            
+            // PASO 3: Verificar que los datos se cargaron correctamente
+            console.log('🔍 Verificando datos cargados desde MongoDB:');
+            console.log(`   - Equipos: ${teams ? teams.length : 0}`);
+            console.log(`   - Jugadores: ${players ? players.length : 0}`);
+            console.log(`   - Clubes: ${clubs ? clubs.length : 0}`);
+            console.log(`   - Clips: ${clips ? clips.length : 0}`);
+            
+            return; // ✅ SALIR AQUÍ - NO cargar archivos locales si MongoDB funciona
         } catch (error) {
             console.error('❌ Error cargando desde MongoDB:', error);
             console.log('⚠️ Continuando con carga desde archivos locales...');
@@ -259,14 +267,14 @@ async function loadTournamentData() {
         console.log('📁 MongoDB no disponible, cargando desde archivos locales...');
     }
     
-    // PASO 2: Cargar desde archivos locales como fallback
+    // PASO 2: Cargar desde archivos locales SOLO como fallback
     console.log('📁 Cargando datos desde archivos locales...');
     await loadFromLocalFiles();
     
-    console.log('✅ Carga de datos completada');
+    console.log('✅ Carga de datos completada desde archivos locales');
     
     // PASO 3: Verificar que los datos se cargaron correctamente
-    console.log('🔍 Verificando datos cargados:');
+    console.log('🔍 Verificando datos cargados desde archivos locales:');
     console.log(`   - Equipos: ${teams ? teams.length : 0}`);
     console.log(`   - Jugadores: ${players ? players.length : 0}`);
     console.log(`   - Clubes: ${clubs ? clubs.length : 0}`);
