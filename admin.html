@@ -265,7 +265,11 @@
         }
         
         /* Fix para imágenes gigantes en tarjetas de clubes del admin */
-        .club-card img {
+        .club-card img,
+        .club-card .club-logo img,
+        .club-card .club-logo-img,
+        .clubs-grid img,
+        #clubsGrid img {
             max-width: 80px !important;
             max-height: 80px !important;
             width: 80px !important;
@@ -273,6 +277,8 @@
             object-fit: cover !important;
             border-radius: 50% !important;
             border: 3px solid #00ff88 !important;
+            display: block !important;
+            margin: 0 auto !important;
         }
 
         .club-card h3 {

@@ -363,7 +363,7 @@ function createClipElement(clip) {
     clipDiv.innerHTML = `
         <div class="clip-thumbnail" onclick="playClip('${clip.id}')">
             <video preload="metadata" muted>
-                <source src="/uploads/${clip.filename}" type="video/mp4">
+                <source src="${clip.video_url || `/uploads/${clip.filename}`}" type="video/mp4">
             </video>
             <div class="play-overlay">
                 <i class="fas fa-play-circle"></i>
@@ -434,9 +434,10 @@ function playClip(clipId) {
             videoLikes.textContent = formatNumber(clip.likes || 0);
             videoDuration.textContent = formatDuration(clip.duration || 0);
             
-            // Set video source with multiple fallback paths
+            // Set video source with Cloudinary URL first, then fallbacks
             const videoSource = videoPlayer.querySelector('source');
             const possiblePaths = [
+                clip.video_url, // Cloudinary URL (primary)
                 clip.filename ? `/uploads/${clip.filename}` : null,
                 clip.filename ? `/uploads/videos/${clip.filename}` : null,
                 `/uploads/${clipId}.mp4`,

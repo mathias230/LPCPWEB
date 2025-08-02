@@ -1120,6 +1120,35 @@ app.get('/api/clips', (req, res) => {
     }
 });
 
+// Obtener clip individual por ID
+app.get('/api/clips/:id', (req, res) => {
+    try {
+        const clipId = req.params.id;
+        const clip = clips.find(c => c.id === clipId);
+        
+        if (!clip) {
+            return res.status(404).json({ error: 'Clip no encontrado' });
+        }
+        
+        // Incrementar vistas
+        clip.views = (clip.views || 0) + 1;
+        
+        // Actualizar estadísticas
+        stats.total_views = clips.reduce((sum, clip) => sum + clip.views, 0);
+        
+        // Guardar cambios
+        saveClips();
+        
+        console.log(`👁️ Clip ${clipId} reproducido. Vistas: ${clip.views}`);
+        
+        res.json(clip);
+        
+    } catch (error) {
+        console.error('❌ Error obteniendo clip:', error);
+        res.status(500).json({ error: 'Error obteniendo clip' });
+    }
+});
+
 // Obtener estadísticas
 app.get('/api/stats', (req, res) => {
     res.json(stats);
