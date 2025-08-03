@@ -1177,27 +1177,45 @@ function setupPlayerEventListeners() {
     }
 }
 
+// Variable global para prevenir doble envío
+let isAddingPlayer = false;
+
 // Agregar jugador rápidamente
 async function addPlayerQuick() {
-    console.log('🎯 INICIANDO addPlayerQuick()...');
+
+    // Prevenir doble envío
+    if (isAddingPlayer) {
+        console.log('⚠️ Ya se está agregando un jugador, ignorando...');
+        return;
+    }
     
     const quickInput = document.getElementById('quickPlayerInput');
+    const quickAddBtn = document.getElementById('quickAddBtn');
     const playerName = quickInput.value.trim();
     
-    console.log('📝 Nombre del jugador:', playerName);
-    console.log('🆔 selectedTeamId:', selectedTeamId);
+    console.log('🏃 addPlayerQuick iniciada con nombre:', playerName);
+    console.log('🎯 selectedTeamId:', selectedTeamId);
     
     if (!playerName) {
-        console.log('❌ Error: Nombre vacío');
+        console.log('⚠️ Nombre vacío, cancelando...');
         showNotification('Por favor ingresa un nombre', 'error');
         return;
     }
     
     if (!selectedTeamId) {
-        console.log('❌ Error: No hay equipo seleccionado');
-        showNotification('Por favor selecciona un equipo', 'error');
+        console.log('⚠️ No hay equipo seleccionado, cancelando...');
+        showNotification('Selecciona un equipo primero', 'error');
         return;
     }
+    
+    // Marcar como ocupado y dar feedback visual
+    isAddingPlayer = true;
+    quickInput.disabled = true;
+    quickAddBtn.disabled = true;
+    quickAddBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    quickInput.placeholder = 'Agregando jugador...';
+    
+    console.log('🔒 UI bloqueada, procesando...');
     
     const playerData = {
         name: playerName,
@@ -1247,6 +1265,14 @@ async function addPlayerQuick() {
         console.error('❌ Error completo en addPlayerQuick:', error);
         console.error('❌ Stack trace:', error.stack);
         showNotification(error.message || 'Error al agregar jugador', 'error');
+    } finally {
+        // Restaurar UI siempre (éxito o error)
+        isAddingPlayer = false;
+        quickInput.disabled = false;
+        quickAddBtn.disabled = false;
+        quickAddBtn.innerHTML = '<i class="fas fa-plus"></i>';
+        quickInput.placeholder = 'Nombre del jugador...';
+        console.log('🔓 UI desbloqueada');
     }
 }
 
