@@ -1,1 +1,19 @@
-[]
+[
+  {
+    "id": "1754402716708",
+    "title": "t",
+    "description": "e",
+    "type": "atajadas",
+    "club": "Coiner FC",
+    "filename": "lpcp-clips/clip-1754402710532-940145178",
+    "video_url": "https://res.cloudinary.com/dhj8sgwga/video/upload/v1754402711/lpcp-clips/clip-1754402710532-940145178.mp4",
+    "thumbnail_url": "https://res.cloudinary.com/dhj8sgwga/video/upload/w_640,h_360,c_pad,q_auto:good/v1754402711/lpcp-clips/clip-1754402710532-940145178.mp4",
+    "duration": 29.8,
+    "format": "mp4",
+    "file_size": 2948893,
+    "upload_date": "2025-08-05T14:05:16.708Z",
+    "views": 3,
+    "likes": 0,
+    "liked_by": []
+  }
+]

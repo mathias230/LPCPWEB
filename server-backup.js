@@ -48,6 +48,22 @@ console.log('  - Cloud Name:', process.env.CLOUDINARY_CLOUD_NAME ? '✅ Configur
 console.log('  - API Key:', process.env.CLOUDINARY_API_KEY ? '✅ Configurado' : '❌ No configurado');
 console.log('  - API Secret:', process.env.CLOUDINARY_API_SECRET ? '✅ Configurado' : '❌ No configurado');
 
+// ==================== VARIABLES GLOBALES CLIPS ====================
+let clips = [];
+let stats = {
+    total_clips: 0,
+    total_views: 0,
+    total_likes: 0,
+    last_updated: new Date().toISOString()
+};
+
+// Directorio de datos
+const dataDir = path.join(__dirname, 'data');
+if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+    console.log('📁 Directorio data creado');
+}
+
 // ==================== MIDDLEWARE ====================
 app.use(cors());
 app.use(express.json());
@@ -141,21 +157,19 @@ const SettingsSchema = new mongoose.Schema({
     updatedAt: { type: Date, default: Date.now }
 });
 
-// Esquema para Clips (solo metadatos, videos en Cloudinary)
 const ClipSchema = new mongoose.Schema({
     title: { type: String, required: true },
-    description: { type: String, required: true },
-    type: { type: String, required: true }, // goles, atajadas, jugadas, etc.
     club: { type: String, required: true },
-    cloudinaryUrl: { type: String, required: true }, // URL del video en Cloudinary
-    cloudinaryPublicId: { type: String, required: true }, // ID público de Cloudinary
-    thumbnailUrl: { type: String, default: '' }, // URL del thumbnail
+    category: { type: String, required: true },
+    video_url: { type: String, required: true }, // URL de Cloudinary
+    filename: String, // ID de Cloudinary para eliminación
+    thumbnail: String, // URL del thumbnail
     views: { type: Number, default: 0 },
     likes: { type: Number, default: 0 },
-    duration: { type: Number, default: 0 }, // duración en segundos
-    fileSize: { type: Number, default: 0 }, // tamaño en bytes
-    uploaderIP: { type: String, default: '' },
-    createdAt: { type: Date, default: Date.now }
+    upload_date: { type: Date, default: Date.now },
+    uploader_ip: String,
+    duration: Number, // Duración en segundos
+    size: Number // Tamaño en bytes
 });
 
 // Crear modelos
@@ -163,49 +177,126 @@ const Team = mongoose.model('Team', TeamSchema);
 const Player = mongoose.model('Player', PlayerSchema);
 const Club = mongoose.model('Club', ClubSchema);
 const Match = mongoose.model('Match', MatchSchema);
+const Clip = mongoose.model('Clip', ClipSchema);
 const TournamentSettings = mongoose.model('TournamentSettings', TournamentSettingsSchema);
 const Settings = mongoose.model('Settings', SettingsSchema);
-const Clip = mongoose.model('Clip', ClipSchema);
 
-// ==================== FUNCIONES MONGODB PARA CLIPS ====================
+// ==================== CLIPS CON MONGODB (persistencia real en la nube) ====================
 
-// Función para obtener estadísticas de clips desde MongoDB
-async function getClipsStats() {
+// Cargar clips desde MongoDB
+async function loadClips() {
+    try {
+        console.log('🔄 Cargando clips desde MongoDB...');
+        
+        // Solo cargar si el array está vacío para evitar sobrescribir clips existentes
+        if (clips.length === 0) {
+            const clipsFromDB = await Clip.find().sort({ upload_date: -1 });
+            
+            // Convertir a formato legacy para compatibilidad
+            clips = clipsFromDB.map(clip => ({
+                id: clip._id.toString(),
+                title: clip.title,
+                club: clip.club,
+                category: clip.category,
+                video_url: clip.video_url,
+                filename: clip.filename,
+                thumbnail: clip.thumbnail,
+                views: clip.views,
+                likes: clip.likes,
+                upload_date: clip.upload_date.toISOString(),
+                uploader_ip: clip.uploader_ip,
+                duration: clip.duration,
+                size: clip.size
+            }));
+            
+            console.log(`✅ Clips cargados desde MongoDB: ${clips.length}`);
+        } else {
+            console.log(`🔄 Clips ya cargados en memoria: ${clips.length}`);
+        }
+        
+        // Actualizar estadísticas
+        await updateStats();
+        
+    } catch (error) {
+        console.error('❌ Error cargando clips desde MongoDB:', error.message);
+        clips = []; // Fallback a array vacío
+    }
+}
+
+// Actualizar estadísticas desde MongoDB
+async function updateStats() {
     try {
         const totalClips = await Clip.countDocuments();
-        const totalViews = await Clip.aggregate([
-            { $group: { _id: null, total: { $sum: '$views' } } }
-        ]);
-        const totalLikes = await Clip.aggregate([
-            { $group: { _id: null, total: { $sum: '$likes' } } }
+        const aggregateStats = await Clip.aggregate([
+            {
+                $group: {
+                    _id: null,
+                    total_views: { $sum: '$views' },
+                    total_likes: { $sum: '$likes' }
+                }
+            }
         ]);
         
-        return {
+        stats = {
             total_clips: totalClips,
-            total_views: totalViews[0]?.total || 0,
-            total_likes: totalLikes[0]?.total || 0
+            total_views: aggregateStats[0]?.total_views || 0,
+            total_likes: aggregateStats[0]?.total_likes || 0,
+            last_updated: new Date().toISOString()
         };
-    } catch (error) {
-        console.error('❌ Error obteniendo estadísticas:', error);
-        return { total_clips: 0, total_views: 0, total_likes: 0 };
-    }
-}
-
-// Función para inicializar clips desde MongoDB
-async function initializeClips() {
-    try {
-        const totalClips = await Clip.countDocuments();
-        const stats = await getClipsStats();
         
-        console.log(`✅ Clips en MongoDB: ${totalClips}`);
-        console.log('✅ Estadísticas cargadas:', stats);
+        console.log(`📊 Estadísticas actualizadas: ${stats.total_clips} clips, ${stats.total_views} vistas, ${stats.total_likes} likes`);
+        
     } catch (error) {
-        console.error('❌ Error inicializando clips:', error);
+        console.error('❌ Error actualizando estadísticas:', error.message);
+        // Fallback a estadísticas por defecto
+        stats = {
+            total_clips: 0,
+            total_views: 0,
+            total_likes: 0,
+            last_updated: new Date().toISOString()
+        };
     }
 }
 
-// Inicializar clips al conectar a MongoDB
-initializeClips();
+// Guardar clip en MongoDB (reemplaza saveClips)
+async function saveClipToDB(clipData) {
+    try {
+        const newClip = new Clip(clipData);
+        const savedClip = await newClip.save();
+        
+        // Actualizar array en memoria para compatibilidad
+        const clipForMemory = {
+            id: savedClip._id.toString(),
+            title: savedClip.title,
+            club: savedClip.club,
+            category: savedClip.category,
+            video_url: savedClip.video_url,
+            filename: savedClip.filename,
+            thumbnail: savedClip.thumbnail,
+            views: savedClip.views,
+            likes: savedClip.likes,
+            upload_date: savedClip.upload_date.toISOString(),
+            uploader_ip: savedClip.uploader_ip,
+            duration: savedClip.duration,
+            size: savedClip.size
+        };
+        
+        clips.unshift(clipForMemory); // Agregar al inicio (más reciente)
+        
+        // Actualizar estadísticas
+        await updateStats();
+        
+        console.log(`💾 Clip guardado en MongoDB: "${clipData.title}"`);
+        return savedClip;
+        
+    } catch (error) {
+        console.error('❌ Error guardando clip en MongoDB:', error.message);
+        throw error;
+    }
+}
+
+// Cargar clips al iniciar
+loadClips();
 
 // ==================== ENDPOINTS MONGODB ====================
 
@@ -759,7 +850,6 @@ app.delete('/api/players/:id', async (req, res) => {
         });
         
     } catch (error) {
-        console.error('❌ Error eliminando jugador:', error);
         res.status(500).json({ error: 'Error eliminando jugador' });
     }
 });
@@ -898,144 +988,72 @@ app.get('/api/standings', async (req, res) => {
 });
 
 // ==================== ENDPOINTS CLIPS ====================
-// NOTA: El endpoint /api/clips está definido más abajo con MongoDB
 
-// Subir clip
-app.post('/api/upload', upload.single('clipFile'), async (req, res) => {
-    try {
-        if (!req.file) {
-            return res.status(400).json({ success: false, error: 'No se subió ningún archivo' });
-        }
-        
-        if (req.file.size > 100 * 1024 * 1024) {
-            return res.status(400).json({ success: false, error: 'Archivo demasiado grande (máximo 100MB)' });
-        }
-        
-        const { clipTitle, clipDescription, clipType, clubSelect } = req.body;
-        
-        if (!clipTitle || !clipDescription || !clipType || !clubSelect) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'Todos los campos son obligatorios' 
-            });
-        }
-        
-        if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
-            return res.status(500).json({ 
-                success: false, 
-                error: 'Cloudinary no está configurado' 
-            });
-        }
-        
-        console.log('☁️ Subiendo video a Cloudinary...');
-        
-        const uploadResult = await new Promise((resolve, reject) => {
-            const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-            const publicId = `clip-${uniqueSuffix}`;
-            
-            cloudinary.uploader.upload_stream(
-                {
-                    resource_type: 'video',
-                    public_id: publicId,
-                    folder: 'lpcp-clips',
-                    quality: 'auto:good',
-                    format: 'mp4',
-                    timeout: 60000
-                },
-                (error, result) => {
-                    if (error) {
-                        reject(error);
-                    } else {
-                        resolve(result);
-                    }
-                }
-            ).end(req.file.buffer);
-        });
-        
-        // Crear clip en MongoDB
-        const newClip = new Clip({
-            title: clipTitle.trim(),
-            description: clipDescription.trim(),
-            type: clipType,
-            club: clubSelect,
-            cloudinaryUrl: uploadResult.secure_url,
-            cloudinaryPublicId: uploadResult.public_id,
-            thumbnailUrl: uploadResult.secure_url.replace('/video/upload/', '/video/upload/w_640,h_360,c_pad,q_auto:good/'),
-            duration: uploadResult.duration || 0,
-            fileSize: uploadResult.bytes || req.file.size,
-            uploaderIP: req.ip || req.connection.remoteAddress || '',
-            views: 0,
-            likes: 0
-        });
-        
-        // Guardar en MongoDB
-        const savedClip = await newClip.save();
-        
-        // Convertir a formato compatible con frontend
-        const clipResponse = {
-            id: savedClip._id.toString(),
-            title: savedClip.title,
-            description: savedClip.description,
-            type: savedClip.type,
-            club: savedClip.club,
-            video_url: savedClip.cloudinaryUrl,
-            thumbnail_url: savedClip.thumbnailUrl,
-            duration: savedClip.duration,
-            file_size: savedClip.fileSize,
-            upload_date: savedClip.createdAt.toISOString(),
-            views: savedClip.views,
-            likes: savedClip.likes
-        };
-        
-        // Emitir evento
-        io.emit('new_clip', clipResponse);
-        
-        console.log(`✅ Clip "${clipTitle}" guardado en MongoDB con ID: ${savedClip._id}`);
-        
-        res.json({ 
-            success: true, 
-            clip: clipResponse,
-            message: 'Clip subido exitosamente' 
-        });
-        
-    } catch (error) {
-        console.error('❌ Error subiendo clip:', error);
-        res.status(500).json({ 
-            success: false, 
-            error: 'Error interno del servidor' 
-        });
+// Obtener clips
+app.get('/api/clips', (req, res) => {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const type = req.query.type;
+    const club = req.query.club;
+    
+    let filteredClips = clips;
+    
+    if (type && type !== 'all') {
+        filteredClips = filteredClips.filter(clip => clip.type === type);
     }
+    
+    if (club && club !== 'all') {
+        filteredClips = filteredClips.filter(clip => clip.club === club);
+    }
+    
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit;
+    const paginatedClips = filteredClips.slice(startIndex, endIndex);
+    
+    res.json({
+        clips: paginatedClips,
+        has_more: endIndex < filteredClips.length,
+        total: filteredClips.length
+    });
 });
+
+// ENDPOINT LEGACY ELIMINADO - Ahora se usa el endpoint con MongoDB más abajo
 
 // Eliminar clip
 app.delete('/api/clips/:id', async (req, res) => {
     try {
         const clipId = req.params.id;
+        const clipIndex = clips.findIndex(c => c.id === clipId);
         
-        // Buscar clip en MongoDB
-        const clip = await Clip.findById(clipId);
-        
-        if (!clip) {
+        if (clipIndex === -1) {
             return res.status(404).json({ success: false, error: 'Clip no encontrado' });
         }
         
+        const clip = clips[clipIndex];
+        
         // Eliminar de Cloudinary
-        if (clip.cloudinaryPublicId) {
+        if (clip.filename) {
             try {
-                await cloudinary.uploader.destroy(clip.cloudinaryPublicId, { resource_type: 'video' });
+                await cloudinary.uploader.destroy(clip.filename, { resource_type: 'video' });
                 console.log('✅ Video eliminado de Cloudinary');
             } catch (error) {
                 console.warn('⚠️ Error eliminando de Cloudinary:', error);
             }
         }
         
-        // Eliminar de MongoDB
-        await Clip.findByIdAndDelete(clipId);
+        // Eliminar del array
+        clips.splice(clipIndex, 1);
+        
+        // Actualizar estadísticas
+        stats.total_clips = clips.length;
+        stats.total_views = clips.reduce((sum, clip) => sum + clip.views, 0);
+        stats.total_likes = clips.reduce((sum, clip) => sum + clip.likes, 0);
+        
+        // Guardar cambios
+        saveClips();
         
         // Emitir evento
         io.emit('clip_deleted', clipId);
-        
-        console.log(`✅ Clip ${clipId} eliminado completamente`);
         
         res.json({ success: true, message: 'Clip eliminado exitosamente' });
         
@@ -1045,308 +1063,121 @@ app.delete('/api/clips/:id', async (req, res) => {
     }
 });
 
-// DEBUG: Endpoint simple para probar clips
-app.get('/api/clips-debug', async (req, res) => {
-    try {
-        console.log('🔍 DEBUG: Probando endpoint clips...');
-        
-        // Probar conexión MongoDB
-        if (mongoose.connection.readyState !== 1) {
-            return res.json({ error: 'MongoDB no conectado', state: mongoose.connection.readyState });
-        }
-        
-        // Probar modelo Clip
-        const count = await Clip.countDocuments();
-        console.log('🔍 DEBUG: Total clips:', count);
-        
-        return res.json({ 
-            success: true, 
-            clipCount: count,
-            message: 'Endpoint funcionando'
-        });
-        
-    } catch (error) {
-        console.error('🔍 DEBUG ERROR:', error);
-        return res.json({ 
-            success: false, 
-            error: error.message,
-            stack: error.stack
-        });
-    }
-});
-
 // Obtener clips con paginación y filtros
-app.get('/api/clips', async (req, res) => {
-    console.log('🔴 INICIO ENDPOINT /api/clips');
+app.get('/api/clips', (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
         const category = req.query.category || 'all';
         const limit = 12; // Clips por página
         
-        console.log(`🎦 Solicitando clips - Página: ${page}, Categoría: ${category}`);
-        console.log('🔴 Verificando modelo Clip:', typeof Clip);
+        console.log(`🎬 Solicitando clips - Página: ${page}, Categoría: ${category}`);
+        console.log(`📊 Total clips en memoria: ${clips.length}`);
+        console.log(`📝 Clips array:`, clips);
         
-        // Verificar conexión a MongoDB
-        if (mongoose.connection.readyState !== 1) {
-            console.error('❌ MongoDB no conectado');
-            return res.json({ 
-                clips: [], 
-                has_more: false, 
-                total: 0,
-                page: page,
-                category: category,
-                error: 'Base de datos no disponible' 
-            });
-        }
-        
-        // Crear filtro para MongoDB
-        let filter = {};
+        // Filtrar clips por categoría
+        let filteredClips = clips;
         if (category !== 'all') {
-            filter.club = new RegExp(category, 'i'); // Filtro case-insensitive
+            filteredClips = clips.filter(clip => 
+                clip.club && clip.club.toLowerCase() === category.toLowerCase()
+            );
+            console.log(`🔍 Clips filtrados por categoría '${category}': ${filteredClips.length}`);
         }
         
-        console.log('🔍 Filtro aplicado:', filter);
+        // Ordenar por fecha de subida (más recientes primero)
+        filteredClips.sort((a, b) => new Date(b.upload_date) - new Date(a.upload_date));
         
-        // Contar total de clips que coinciden con el filtro
-        console.log('📊 Contando clips...');
-        const totalClips = await Clip.countDocuments(filter);
-        console.log(`📊 Total clips encontrados: ${totalClips}`);
-        
-        // Obtener clips con paginación
-        console.log('📄 Obteniendo clips con paginación...');
-        const clips = await Clip.find(filter)
-            .sort({ createdAt: -1 }) // Más recientes primero
-            .skip((page - 1) * limit)
-            .limit(limit)
-            .lean(); // Para mejor rendimiento
-        
-        console.log(`📄 Clips obtenidos de MongoDB: ${clips ? clips.length : 0}`);
-        
-        // Manejar caso cuando no hay clips
-        if (!clips || clips.length === 0) {
-            console.log('💭 Base de datos vacía, devolviendo array vacío');
-            return res.json({
-                clips: [],
-                has_more: false,
-                total: 0,
-                page: page,
-                category: category
-            });
-        }
-        
-        // Convertir a formato compatible con frontend
-        console.log('🔄 Convirtiendo formato...');
-        const formattedClips = clips.map(clip => {
-            try {
-                if (!clip || !clip._id) {
-                    console.warn('⚠️ Clip inválido encontrado:', clip);
-                    return null;
-                }
-                
-                return {
-                    id: clip._id.toString(),
-                    title: clip.title || 'Sin título',
-                    description: clip.description || 'Sin descripción',
-                    type: clip.type || 'general',
-                    club: clip.club || 'Sin club',
-                    video_url: clip.cloudinaryUrl || '',
-                    thumbnail_url: clip.thumbnailUrl || '',
-                    duration: clip.duration || 0,
-                    file_size: clip.fileSize || 0,
-                    upload_date: clip.createdAt ? clip.createdAt.toISOString() : new Date().toISOString(),
-                    views: clip.views || 0,
-                    likes: clip.likes || 0
-                };
-            } catch (formatError) {
-                console.error('❌ Error formateando clip:', formatError, clip);
-                return null;
-            }
-        }).filter(clip => clip !== null);
+        // Paginación
+        const startIndex = (page - 1) * limit;
+        const endIndex = startIndex + limit;
+        const paginatedClips = filteredClips.slice(startIndex, endIndex);
         
         // Verificar si hay más páginas
-        const hasMore = page * limit < totalClips;
+        const hasMore = endIndex < filteredClips.length;
         
-        console.log(`✅ Enviando ${formattedClips.length} clips de ${totalClips} total`);
+        console.log(`✅ Enviando ${paginatedClips.length} clips de ${filteredClips.length} total`);
         
         res.json({
-            clips: formattedClips,
+            clips: paginatedClips,
             has_more: hasMore,
-            total: totalClips,
+            total: filteredClips.length,
             page: page,
             category: category
         });
         
     } catch (error) {
-        console.error('❌ Error detallado obteniendo clips:', {
-            message: error.message,
-            stack: error.stack,
-            name: error.name
-        });
-        res.json({ 
+        console.error('❌ Error obteniendo clips:', error);
+        res.status(500).json({ 
             clips: [], 
             has_more: false, 
-            total: 0,
-            page: parseInt(req.query.page) || 1,
-            category: req.query.category || 'all',
-            error: `Error obteniendo clips: ${error.message}` 
+            error: 'Error obteniendo clips' 
         });
     }
 });
 
 // Obtener clip individual por ID
-app.get('/api/clips/:id', async (req, res) => {
+app.get('/api/clips/:id', (req, res) => {
     try {
         const clipId = req.params.id;
-        const clip = await Clip.findById(clipId);
+        const clip = clips.find(c => c.id === clipId);
         
         if (!clip) {
             return res.status(404).json({ error: 'Clip no encontrado' });
         }
         
-        // Convertir a formato compatible con frontend
-        const clipResponse = {
-            id: clip._id.toString(),
-            title: clip.title,
-            description: clip.description,
-            type: clip.type,
-            club: clip.club,
-            video_url: clip.cloudinaryUrl,
-            thumbnail_url: clip.thumbnailUrl,
-            duration: clip.duration,
-            file_size: clip.fileSize,
-            upload_date: clip.createdAt.toISOString(),
-            views: clip.views,
-            likes: clip.likes
-        };
+        // Incrementar vistas
+        clip.views = (clip.views || 0) + 1;
         
-        console.log(`📺 Clip ${clipId} obtenido`);
+        // Actualizar estadísticas
+        stats.total_views = clips.reduce((sum, clip) => sum + clip.views, 0);
         
-        res.json(clipResponse);
+        // Guardar cambios
+        saveClips();
+        
+        console.log(`👁️ Clip ${clipId} reproducido. Vistas: ${clip.views}`);
+        
+        res.json(clip);
         
     } catch (error) {
-        console.error('❌ Error obteniendo clip:', error);
-        res.status(500).json({ error: 'Error obteniendo clip' });
-    }
-});
-
-// Incrementar vistas de un clip
-app.post('/api/clips/:id/view', async (req, res) => {
-    try {
-        const clipId = req.params.id;
-        
-        // Incrementar vistas en MongoDB
-        const clip = await Clip.findByIdAndUpdate(
-            clipId,
-            { $inc: { views: 1 } },
-            { new: true }
-        );
-        
-        if (!clip) {
-            return res.status(404).json({ error: 'Clip no encontrado' });
-        }
-        
-        // Obtener estadísticas actualizadas
-        const stats = await getClipsStats();
-        
-        console.log(`👁️ Vista incrementada para clip ${clipId}. Total vistas: ${clip.views}`);
-        
-        res.json({ 
-            success: true, 
-            views: clip.views,
-            total_views: stats.total_views
-        });
-        
-    } catch (error) {
-        console.error('❌ Error incrementando vistas:', error);
-        res.status(500).json({ error: 'Error incrementando vistas' });
-    }
-});
 
 // Dar like a un clip
-app.post('/api/clips/:id/like', async (req, res) => {
+app.post('/api/clips/:id/like', (req, res) => {
     try {
         const clipId = req.params.id;
-        
-        // Incrementar likes en MongoDB
-        const clip = await Clip.findByIdAndUpdate(
-            clipId,
-            { $inc: { likes: 1 } },
-            { new: true }
-        );
+        const clip = clips.find(c => c.id === clipId);
         
         if (!clip) {
-            return res.status(404).json({ error: 'Clip no encontrado' });
+            return res.status(404).json({ success: false, error: 'Clip no encontrado' });
         }
         
-        // Obtener estadísticas actualizadas
-        const stats = await getClipsStats();
+        // Incrementar likes
+        clip.likes = (clip.likes || 0) + 1;
         
-        console.log(`❤️ Like agregado al clip ${clipId}. Total likes: ${clip.likes}`);
+        // Actualizar estadísticas
+        stats.total_likes = clips.reduce((sum, clip) => sum + clip.likes, 0);
         
-        // Emitir evento en tiempo real
+        // Guardar cambios
+        saveClips();
+        
+        // Emitir evento WebSocket
         io.emit('clip_liked', { clipId, likes: clip.likes });
+        
+        console.log(`❤️ Clip ${clipId} recibió like. Total likes: ${clip.likes}`);
         
         res.json({ 
             success: true, 
             likes: clip.likes,
-            total_likes: stats.total_likes
+            message: 'Like agregado exitosamente'
         });
         
     } catch (error) {
-        console.error('❌ Error dando like:', error);
-        res.status(500).json({ error: 'Error dando like' });
-    }
-});
-
-// Endpoint de prueba para MongoDB
-app.get('/api/test-db', async (req, res) => {
-    try {
-        console.log('🧪 Probando conexión a MongoDB...');
-        
-        // Verificar estado de conexión
-        const connectionState = mongoose.connection.readyState;
-        console.log('📊 Estado de conexión MongoDB:', connectionState);
-        
-        // Probar consulta simple
-        const clipCount = await Clip.countDocuments();
-        console.log('📊 Total clips en base de datos:', clipCount);
-        
-        // Probar obtener un clip de ejemplo
-        const sampleClip = await Clip.findOne().lean();
-        console.log('📄 Clip de ejemplo:', sampleClip);
-        
-        res.json({
-            success: true,
-            connectionState,
-            clipCount,
-            sampleClip,
-            message: 'MongoDB funcionando correctamente'
-        });
-        
-    } catch (error) {
-        console.error('❌ Error en prueba de MongoDB:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message,
-            stack: error.stack
-        });
+        console.error('❌ Error dando like al clip:', error);
+        res.status(500).json({ success: false, error: 'Error dando like al clip' });
     }
 });
 
 // Obtener estadísticas
-app.get('/api/stats', async (req, res) => {
-    try {
-        const stats = await getClipsStats();
-        res.json(stats);
-    } catch (error) {
-        console.error('❌ Error obteniendo estadísticas:', error);
-        res.status(500).json({ 
-            total_clips: 0, 
-            total_views: 0, 
-            total_likes: 0,
-            error: 'Error obteniendo estadísticas'
-        });
-    }
+app.get('/api/stats', (req, res) => {
+    res.json(stats);
 });
 
 // Obtener configuración del torneo
@@ -2260,6 +2091,14 @@ app.get('/admin-panel.html', (req, res) => {
     res.sendFile(path.join(__dirname, 'admin.html'));
 });
 
+app.get('/admin-clean.html', (req, res) => {
+    res.sendFile(path.join(__dirname, 'admin-clean.html'));
+});
+
+app.get('/admin-new.html', (req, res) => {
+    res.sendFile(path.join(__dirname, 'admin-new.html'));
+});
+
 app.get('/clips.html', (req, res) => {
     res.sendFile(path.join(__dirname, 'clips.html'));
 });
@@ -2268,23 +2107,282 @@ app.get('/jugadores.html', (req, res) => {
     res.sendFile(path.join(__dirname, 'jugadores.html'));
 });
 
+// ==================== ENDPOINTS DE CLIPS CON MONGODB ====================
+
+// Subir clip
+app.post('/api/upload', upload.single('video'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ success: false, error: 'No se proporcionó archivo' });
+        }
+
+        const { title, club, category } = req.body;
+        
+        if (!title || !club || !category) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Faltan campos requeridos: title, club, category' 
+            });
+        }
+
+        console.log('☁️ Subiendo video a Cloudinary...');
+        
+        // Subir a Cloudinary usando Promise
+        const uploadResult = await new Promise((resolve, reject) => {
+            const uploadStream = cloudinary.uploader.upload_stream(
+                {
+                    resource_type: 'video',
+                    folder: 'lpcp-clips',
+                    transformation: [
+                        { quality: 'auto' },
+                        { fetch_format: 'auto' }
+                    ]
+                },
+                (error, result) => {
+                    if (error) {
+                        console.error('❌ Error subiendo a Cloudinary:', error);
+                        reject(error);
+                    } else {
+                        console.log('✅ Video subido a Cloudinary exitosamente');
+                        resolve(result);
+                    }
+                }
+            );
+            
+            // Enviar el buffer al stream
+            uploadStream.end(req.file.buffer);
+        });
+        
+        // Crear objeto de clip para MongoDB
+        const clipData = {
+            title: title.trim(),
+            club: club.trim(),
+            category: category.trim(),
+            video_url: uploadResult.secure_url,
+            filename: uploadResult.public_id,
+            thumbnail: uploadResult.secure_url.replace('/video/upload/', '/video/upload/so_0/'),
+            views: 0,
+            likes: 0,
+            uploader_ip: req.ip,
+            duration: uploadResult.duration || 0,
+            size: uploadResult.bytes || 0
+        };
+
+        // Guardar en MongoDB
+        const savedClip = await saveClipToDB(clipData);
+        
+        // Emitir evento WebSocket
+        io.emit('clipUploaded', {
+            id: savedClip._id.toString(),
+            title: savedClip.title,
+            club: savedClip.club,
+            category: savedClip.category,
+            video_url: savedClip.video_url,
+            thumbnail: savedClip.thumbnail,
+            views: savedClip.views,
+            likes: savedClip.likes,
+            upload_date: savedClip.upload_date.toISOString()
+        });
+        
+        io.emit('statsUpdate', stats);
+        
+        console.log(`✅ Clip "${title}" subido exitosamente`);
+        
+        res.json({
+            success: true,
+            message: 'Clip subido exitosamente',
+            clip: {
+                id: savedClip._id.toString(),
+                title: savedClip.title,
+                video_url: savedClip.video_url,
+                thumbnail: savedClip.thumbnail
+            }
+        });
+        
+    } catch (error) {
+        console.error('❌ Error en upload:', error);
+        res.status(500).json({ success: false, error: 'Error interno del servidor' });
+    }
+});
+
+// Obtener clips con paginación
+app.get('/api/clips', async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const category = req.query.category || 'all';
+        const limit = 12;
+        
+        console.log(`🎬 Solicitando clips - Página: ${page}, Categoría: ${category}`);
+        
+        // Construir filtro
+        let filter = {};
+        if (category !== 'all') {
+            filter.club = new RegExp(category, 'i');
+        }
+        
+        // Obtener clips desde MongoDB
+        const totalClips = await Clip.countDocuments(filter);
+        const clipsFromDB = await Clip.find(filter)
+            .sort({ upload_date: -1 })
+            .skip((page - 1) * limit)
+            .limit(limit);
+        
+        // Convertir a formato legacy
+        const clipsForResponse = clipsFromDB.map(clip => ({
+            id: clip._id.toString(),
+            title: clip.title,
+            club: clip.club,
+            category: clip.category,
+            video_url: clip.video_url,
+            thumbnail: clip.thumbnail,
+            views: clip.views,
+            likes: clip.likes,
+            upload_date: clip.upload_date.toISOString(),
+            duration: clip.duration,
+            size: clip.size
+        }));
+        
+        const hasMore = (page * limit) < totalClips;
+        
+        console.log(`✅ Enviando ${clipsForResponse.length} clips de ${totalClips} total`);
+        
+        res.json({
+            clips: clipsForResponse,
+            has_more: hasMore,
+            total: totalClips,
+            page: page,
+            category: category
+        });
+        
+    } catch (error) {
+        console.error('❌ Error obteniendo clips:', error);
+        res.status(500).json({ success: false, error: 'Error obteniendo clips' });
+    }
+});
+
+// Dar like a clip
+app.post('/api/clips/:id/like', async (req, res) => {
+    try {
+        const clipId = req.params.id;
+        
+        // Actualizar en MongoDB
+        const updatedClip = await Clip.findByIdAndUpdate(
+            clipId,
+            { $inc: { likes: 1 } },
+            { new: true }
+        );
+        
+        if (!updatedClip) {
+            return res.status(404).json({ success: false, error: 'Clip no encontrado' });
+        }
+        
+        // Actualizar en memoria
+        const clipIndex = clips.findIndex(c => c.id === clipId);
+        if (clipIndex !== -1) {
+            clips[clipIndex].likes = updatedClip.likes;
+        }
+        
+        // Actualizar estadísticas
+        await updateStats();
+        
+        // Emitir evento WebSocket
+        io.emit('clipLiked', {
+            id: clipId,
+            likes: updatedClip.likes
+        });
+        
+        io.emit('statsUpdate', stats);
+        
+        res.json({
+            success: true,
+            likes: updatedClip.likes
+        });
+        
+    } catch (error) {
+        console.error('❌ Error dando like:', error);
+        res.status(500).json({ success: false, error: 'Error dando like' });
+    }
+});
+
+// Eliminar clip
+app.delete('/api/clips/:id', async (req, res) => {
+    try {
+        const clipId = req.params.id;
+        
+        // Buscar clip en MongoDB
+        const clip = await Clip.findById(clipId);
+        if (!clip) {
+            return res.status(404).json({ success: false, error: 'Clip no encontrado' });
+        }
+        
+        // Eliminar de Cloudinary si existe
+        if (clip.filename) {
+            try {
+                await cloudinary.uploader.destroy(clip.filename, { resource_type: 'video' });
+                console.log('✅ Video eliminado de Cloudinary');
+            } catch (error) {
+                console.warn('⚠️ Error eliminando de Cloudinary:', error);
+            }
+        }
+        
+        // Eliminar de MongoDB
+        await Clip.findByIdAndDelete(clipId);
+        
+        // Eliminar de memoria
+        const clipIndex = clips.findIndex(c => c.id === clipId);
+        if (clipIndex !== -1) {
+            clips.splice(clipIndex, 1);
+        }
+        
+        // Actualizar estadísticas
+        await updateStats();
+        
+        // Emitir evento WebSocket
+        io.emit('clipDeleted', { id: clipId });
+        io.emit('statsUpdate', stats);
+        
+        console.log(`✅ Clip eliminado: ${clip.title}`);
+        
+        res.json({ success: true, message: 'Clip eliminado exitosamente' });
+        
+    } catch (error) {
+        console.error('❌ Error eliminando clip:', error);
+        res.status(500).json({ success: false, error: 'Error eliminando clip' });
+    }
+});
+
+// Obtener estadísticas
+app.get('/api/stats', async (req, res) => {
+    try {
+        await updateStats();
+        res.json(stats);
+    } catch (error) {
+        console.error('❌ Error obteniendo estadísticas:', error);
+        res.status(500).json({ success: false, error: 'Error obteniendo estadísticas' });
+    }
+});
+
 // ==================== WEBSOCKETS ====================
-io.on('connection', async (socket) => {
+io.on('connection', (socket) => {
     console.log('Usuario conectado:', socket.id);
     
-    // Enviar estadísticas actualizadas desde MongoDB
-    try {
-        const stats = await getClipsStats();
-        socket.emit('statsUpdate', stats);
-    } catch (error) {
-        console.error('❌ Error enviando estadísticas por WebSocket:', error);
-        socket.emit('statsUpdate', { total_clips: 0, total_views: 0, total_likes: 0 });
-    }
+    socket.emit('statsUpdate', stats);
     
     socket.on('disconnect', () => {
         console.log('Usuario desconectado:', socket.id);
     });
 });
+
+// ==================== INICIALIZAR DATOS ====================
+// Cargar clips al iniciar el servidor (asíncrono)
+(async () => {
+    try {
+        await loadClips();
+        console.log('🎬 Inicialización de clips completada');
+    } catch (error) {
+        console.error('❌ Error inicializando clips:', error);
+    }
+})();
 
 // ==================== INICIAR SERVIDOR ====================
 console.log('🚀 Iniciando servidor LPCP limpio...');
@@ -2292,6 +2390,7 @@ console.log('💾 MongoDB: Equipos, jugadores, clubes, partidos');
 console.log('🎥 Cloudinary: Videos de clips');
 console.log('📝 Archivos locales: Solo metadatos de clips');
 
+// Forzar redeploy para arreglar archivo corrupto
 server.listen(PORT, () => {
     console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
     console.log(`📱 Panel admin: http://localhost:${PORT}/admin.html`);

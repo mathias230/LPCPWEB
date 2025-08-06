@@ -284,13 +284,62 @@ function setupEventListeners() {
         loadClips();
     });
 
-    // File upload styling
+    // File upload styling and validation
     const fileInput = document.getElementById('clipFile');
     const fileLabel = document.querySelector('.file-upload-label span');
+    const fileUploadDiv = document.querySelector('.file-upload');
     
     fileInput.addEventListener('change', (e) => {
-        const fileName = e.target.files[0]?.name || 'Seleccionar archivo de video';
-        fileLabel.textContent = fileName;
+        const file = e.target.files[0];
+        
+        if (!file) {
+            fileLabel.textContent = 'Seleccionar o grabar video';
+            fileUploadDiv.classList.remove('file-selected', 'file-error');
+            return;
+        }
+        
+        // Validate file size (100MB max)
+        const maxSize = 100 * 1024 * 1024;
+        if (file.size > maxSize) {
+            fileLabel.textContent = 'Archivo demasiado grande (máx 100MB)';
+            fileUploadDiv.classList.add('file-error');
+            fileUploadDiv.classList.remove('file-selected');
+            showError('El archivo es demasiado grande. Máximo 100MB permitido.');
+            fileInput.value = ''; // Clear the input
+            return;
+        }
+        
+        // Validate file type
+        const allowedTypes = ['video/mp4', 'video/mov', 'video/avi', 'video/webm', 'video/quicktime'];
+        if (!allowedTypes.includes(file.type) && !file.type.startsWith('video/')) {
+            fileLabel.textContent = 'Formato no soportado';
+            fileUploadDiv.classList.add('file-error');
+            fileUploadDiv.classList.remove('file-selected');
+            showError('Formato de video no soportado. Usa MP4, MOV, AVI o WEBM.');
+            fileInput.value = ''; // Clear the input
+            return;
+        }
+        
+        // File is valid
+        const fileName = file.name;
+        const fileSize = (file.size / (1024 * 1024)).toFixed(1); // Size in MB
+        fileLabel.textContent = `${fileName} (${fileSize}MB)`;
+        fileUploadDiv.classList.add('file-selected');
+        fileUploadDiv.classList.remove('file-error');
+        
+        console.log('📁 Archivo seleccionado:', {
+            name: fileName,
+            size: fileSize + 'MB',
+            type: file.type
+        });
+    });
+    
+    // Handle file input errors on mobile
+    fileInput.addEventListener('error', (e) => {
+        console.error('Error al seleccionar archivo:', e);
+        showError('Error al seleccionar el archivo. Inténtalo de nuevo.');
+        fileLabel.textContent = 'Seleccionar o grabar video';
+        fileUploadDiv.classList.remove('file-selected', 'file-error');
     });
 }
 
@@ -622,6 +671,9 @@ async function handleUpload(e) {
     const formData = new FormData(uploadForm);
     const submitBtn = uploadForm.querySelector('button[type="submit"]');
     const originalText = submitBtn.innerHTML;
+    const progressContainer = document.getElementById('uploadProgress');
+    const progressFill = document.getElementById('progressFill');
+    const progressText = document.getElementById('progressText');
     
     // Validar que se hayan llenado todos los campos
     const clipTitle = formData.get('clipTitle');
@@ -635,9 +687,35 @@ async function handleUpload(e) {
         return;
     }
     
-    // Show loading state
+    // Validar tipo y tamaño de archivo
+    const maxSize = 100 * 1024 * 1024; // 100MB
+    const allowedTypes = ['video/mp4', 'video/mov', 'video/avi', 'video/webm', 'video/quicktime'];
+    
+    if (clipFile.size > maxSize) {
+        showError('El archivo es demasiado grande. Máximo 100MB permitido.');
+        return;
+    }
+    
+    if (!allowedTypes.includes(clipFile.type) && !clipFile.type.startsWith('video/')) {
+        showError('Formato de video no soportado. Usa MP4, MOV, AVI o WEBM.');
+        return;
+    }
+    
+    // Show loading state and progress bar
     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Subiendo...';
     submitBtn.disabled = true;
+    progressContainer.style.display = 'block';
+    
+    // Simulate progress for mobile feedback
+    let progress = 0;
+    const progressInterval = setInterval(() => {
+        if (progress < 90) {
+            progress += Math.random() * 10;
+            if (progress > 90) progress = 90;
+            progressFill.style.width = progress + '%';
+            progressText.textContent = Math.round(progress) + '%';
+        }
+    }, 200);
     
     try {
         // Intentar subir al servidor primero
@@ -648,17 +726,38 @@ async function handleUpload(e) {
         
         const data = await response.json();
         
+        // Complete progress
+        clearInterval(progressInterval);
+        progressFill.style.width = '100%';
+        progressText.textContent = '100%';
+        
         if (data.success) {
-            handleSuccessfulUpload();
+            setTimeout(() => {
+                handleSuccessfulUpload();
+                progressContainer.style.display = 'none';
+                progressFill.style.width = '0%';
+                progressText.textContent = '0%';
+            }, 500);
         } else {
+            progressContainer.style.display = 'none';
             showError(data.error || 'Error al subir el clip');
         }
     } catch (error) {
         console.log('Servidor no disponible, simulando subida exitosa');
-        // Simular subida exitosa cuando no hay servidor
+        
+        // Continue progress simulation
         setTimeout(() => {
-            handleSuccessfulUpload();
-        }, 2000); // Simular tiempo de subida
+            clearInterval(progressInterval);
+            progressFill.style.width = '100%';
+            progressText.textContent = '100%';
+            
+            setTimeout(() => {
+                handleSuccessfulUpload();
+                progressContainer.style.display = 'none';
+                progressFill.style.width = '0%';
+                progressText.textContent = '0%';
+            }, 500);
+        }, 1500);
     } finally {
         submitBtn.innerHTML = originalText;
         submitBtn.disabled = false;

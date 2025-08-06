@@ -150,11 +150,20 @@
                     <div class="form-group">
                         <label for="clipFile">Archivo de Video</label>
                         <div class="file-upload">
-                            <input type="file" id="clipFile" name="clipFile" accept="video/*" required>
+                            <input type="file" id="clipFile" name="clipFile" 
+                                   accept="video/mp4,video/mov,video/avi,video/webm,video/*" 
+                                   capture="environment" 
+                                   required>
                             <label for="clipFile" class="file-upload-label">
                                 <i class="fas fa-cloud-upload-alt"></i>
-                                <span>Seleccionar archivo de video</span>
+                                <span>Seleccionar o grabar video</span>
                             </label>
+                            <div class="upload-progress" id="uploadProgress" style="display: none;">
+                                <div class="progress-bar">
+                                    <div class="progress-fill" id="progressFill"></div>
+                                </div>
+                                <span class="progress-text" id="progressText">0%</span>
+                            </div>
                         </div>
                     </div>
                     
