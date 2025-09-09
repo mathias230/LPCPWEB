@@ -1149,7 +1149,7 @@ function shareVideo(clipId) {
     if (navigator.share) {
         navigator.share({
             title: 'Mira este clip increíble',
-            text: 'Échale un vistazo a este clip de la Liga Panameña de Clubes Pro',
+            text: 'Échale un vistazo a este clip de la AMERICA PRO CLUBS',
             url: shareUrl
         }).catch(console.error);
     } else {

@@ -401,10 +401,6 @@ function switchTab(tabId) {
         case 'teams':
             loadTeams();
             // Solución directa y simple
-            setTimeout(() => {
-                console.log('🚀 SOLUCIÓN DIRECTA: Agregando botones...');
-                addEditButtonsToTeams();
-            }, 500);
             break;
         case 'clubs':
             loadClubs();
@@ -416,6 +412,13 @@ function switchTab(tabId) {
         case 'matches':
             loadMatches();
             populateTeamSelects();
+            // Add delay to ensure DOM is ready
+            setTimeout(() => {
+                console.log('🔄 Ejecutando setTimeout para initializeMatchGeneration...');
+                initializeMatchGeneration();
+            }, 500);
+            // Also try immediate call as backup
+            initializeMatchGeneration();
             break;
         case 'results':
             loadPendingMatches();
@@ -1009,22 +1012,45 @@ function renderTeamTabs(teams) {
 
 // Seleccionar equipo
 function selectTeam(teamId, teamName) {
+    console.log('🎯 SELECCIONANDO EQUIPO:', teamId, teamName);
     selectedTeamId = teamId;
     
     // Actualizar pestañas activas
     document.querySelectorAll('.team-tab').forEach(tab => {
         tab.classList.remove('active');
     });
-    document.querySelector(`[data-team-id="${teamId}"]`).classList.add('active');
+    
+    const targetTab = document.querySelector(`[data-team-id="${teamId}"]`);
+    if (targetTab) {
+        targetTab.classList.add('active');
+        console.log('✅ Pestaña activada:', targetTab);
+    } else {
+        console.error('❌ No se encontró la pestaña para el equipo:', teamId);
+    }
     
     // Mostrar contenedor de input rápido
     const quickAddContainer = document.getElementById('quickAddContainer');
     const teamPlayersContainer = document.getElementById('teamPlayersContainer');
     const selectedTeamNameElement = document.getElementById('selectedTeamName');
     
-    if (quickAddContainer) quickAddContainer.style.display = 'block';
-    if (teamPlayersContainer) teamPlayersContainer.style.display = 'block';
-    if (selectedTeamNameElement) selectedTeamNameElement.textContent = teamName;
+    console.log('🔍 Elementos encontrados:', {
+        quickAddContainer: !!quickAddContainer,
+        teamPlayersContainer: !!teamPlayersContainer,
+        selectedTeamNameElement: !!selectedTeamNameElement
+    });
+    
+    if (quickAddContainer) {
+        quickAddContainer.style.display = 'block';
+        console.log('✅ quickAddContainer mostrado');
+    }
+    if (teamPlayersContainer) {
+        teamPlayersContainer.style.display = 'block';
+        console.log('✅ teamPlayersContainer mostrado');
+    }
+    if (selectedTeamNameElement) {
+        selectedTeamNameElement.textContent = teamName;
+        console.log('✅ Nombre del equipo actualizado:', teamName);
+    }
     
     // Cargar jugadores del equipo seleccionado
     loadTeamPlayers(teamId);
@@ -1032,8 +1058,8 @@ function selectTeam(teamId, teamName) {
     // Enfocar el input
     const quickInput = document.getElementById('quickPlayerInput');
     if (quickInput) {
-        quickInput.focus();
-        quickInput.value = '';
+        setTimeout(() => quickInput.focus(), 100);
+        console.log('✅ Input enfocado');
     }
 }
 
@@ -1160,20 +1186,35 @@ function renderTeamPlayers() {
 
 // Configurar event listeners para el sistema rápido
 function setupPlayerEventListeners() {
+    console.log('🔧 CONFIGURANDO EVENT LISTENERS DE JUGADORES...');
     const quickInput = document.getElementById('quickPlayerInput');
     const quickAddBtn = document.getElementById('quickAddBtn');
     
+    console.log('🔍 Elementos encontrados:', {
+        quickInput: !!quickInput,
+        quickAddBtn: !!quickAddBtn
+    });
+    
     if (quickInput) {
-        quickInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                addPlayerQuick();
-            }
-        });
+        // Remover listeners existentes para evitar duplicados
+        quickInput.removeEventListener('keypress', handleQuickInputKeypress);
+        quickInput.addEventListener('keypress', handleQuickInputKeypress);
+        console.log('✅ Event listener agregado al input');
     }
     
     if (quickAddBtn) {
+        // Remover listeners existentes para evitar duplicados
+        quickAddBtn.removeEventListener('click', addPlayerQuick);
         quickAddBtn.addEventListener('click', addPlayerQuick);
+        console.log('✅ Event listener agregado al botón +');
+    }
+}
+
+// Función separada para manejar el keypress del input
+function handleQuickInputKeypress(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        addPlayerQuick();
     }
 }
 
@@ -1874,6 +1915,283 @@ async function deleteMatch(matchId) {
     }
 }
 
+// ==================== AUTOMATIC MATCH GENERATION ====================
+
+async function initializeMatchGeneration() {
+    console.log('🔧 Inicializando generación de partidos...');
+    
+    // Wait a bit more for DOM to be ready
+    await new Promise(resolve => setTimeout(resolve, 200));
+    
+    const generateBtn = document.getElementById('generateMatchesBtn');
+    console.log('🔧 Botón encontrado:', !!generateBtn);
+    console.log('🔧 Elemento completo:', generateBtn);
+    
+    if (generateBtn) {
+        // Remove any existing listeners first
+        generateBtn.removeEventListener('click', generateMatches);
+        generateBtn.addEventListener('click', generateMatches);
+        console.log('✅ Event listener agregado al botón');
+        
+        // Test click manually with direct onclick
+        generateBtn.onclick = function(e) {
+            e.preventDefault();
+            console.log('🎯 CLICK DETECTADO EN EL BOTÓN!');
+            generateMatches();
+        };
+        
+        // Also add a direct test
+        console.log('🧪 Agregando test directo al botón...');
+        generateBtn.style.cursor = 'pointer';
+        generateBtn.setAttribute('data-initialized', 'true');
+        
+    } else {
+        console.log('❌ No se encontró el botón generateMatchesBtn');
+        // Try to find it by class or other means
+        const allButtons = document.querySelectorAll('button');
+        console.log('🔍 Todos los botones encontrados:', allButtons.length);
+        allButtons.forEach((btn, index) => {
+            console.log(`Botón ${index}:`, btn.id, btn.textContent?.trim());
+        });
+        
+        // Try to find by text content
+        const matchBtn = Array.from(allButtons).find(btn => 
+            btn.textContent?.includes('Generar') && btn.textContent?.includes('Partidos')
+        );
+        if (matchBtn) {
+            console.log('🎯 Encontrado botón por texto:', matchBtn);
+            matchBtn.onclick = function(e) {
+                e.preventDefault();
+                console.log('🎯 CLICK DETECTADO POR TEXTO!');
+                generateMatches();
+            };
+        }
+    }
+}
+
+async function generateMatches() {
+    console.log('🎯 generateMatches() iniciado');
+    
+    if (!confirm('¿Estás seguro de que quieres generar todos los partidos?')) {
+        console.log('❌ Usuario canceló la generación');
+        return;
+    }
+    
+    console.log('✅ Usuario confirmó la generación');
+    
+    const teams = await getTeamsForGeneration();
+    console.log('📊 Equipos obtenidos:', teams.length, teams);
+    
+    if (teams.length < 2) {
+        console.log('❌ No hay suficientes equipos');
+        showNotification('Se necesitan al menos 2 equipos para generar partidos', 'error');
+        return;
+    }
+    
+    const startDate = document.getElementById('startDate').value || null;
+    const defaultTime = document.getElementById('defaultTime').value || null;
+    const roundTrip = document.getElementById('roundTrip').checked;
+    
+    console.log('⚙️ Configuración:', { startDate, defaultTime, roundTrip });
+    
+    const matches = generateMatchSchedule(teams, startDate, defaultTime, roundTrip);
+    console.log('🎮 Partidos generados:', matches.length, matches);
+    
+    if (matches.length === 0) {
+        console.log('❌ No se generaron partidos');
+        showNotification('No se pudieron generar partidos', 'error');
+        return;
+    }
+    
+    try {
+        showNotification('Generando partidos...', 'info');
+        console.log('📡 Enviando al servidor...');
+        
+        const response = await fetch('/api/matches/generate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ matches })
+        });
+        
+        console.log('📡 Respuesta del servidor:', response.status);
+        
+        const result = await response.json();
+        console.log('📊 Resultado:', result);
+        
+        if (response.ok) {
+            showNotification(`${result.created} partidos generados exitosamente`, 'success');
+            await loadMatches();
+        } else {
+            console.log('❌ Error del servidor:', result.error);
+            showNotification(result.error || 'Error generando partidos', 'error');
+        }
+    } catch (error) {
+        console.error('❌ Error de conexión:', error);
+        showNotification('Error de conexión', 'error');
+    }
+}
+
+async function getTeamsForGeneration() {
+    try {
+        const response = await fetch('/api/teams');
+        if (response.ok) {
+            return await response.json();
+        }
+        return [];
+    } catch (error) {
+        console.error('Error fetching teams:', error);
+        return [];
+    }
+}
+
+function generateMatchSchedule(teams, startDate, defaultTime, roundTrip) {
+    console.log('🏗️ generateMatchSchedule iniciado');
+    console.log('📊 Parámetros:', { teams: teams.length, startDate, defaultTime, roundTrip });
+    
+    const matches = [];
+    const numTeams = teams.length;
+    
+    if (numTeams < 2) {
+        console.log('❌ No hay suficientes equipos');
+        return matches;
+    }
+    
+    // Algoritmo Round Robin clásico - garantiza exactamente (n-1) jornadas con n/2 partidos cada una
+    function generateRoundRobin(teamsArray, isSecondLeg = false) {
+        const n = teamsArray.length;
+        const rounds = n - 1; // Siempre n-1 jornadas para n equipos pares
+        
+        let currentMatchday = isSecondLeg ? rounds + 1 : 1;
+        
+        // Crear lista de equipos (el primer equipo se mantiene fijo)
+        const teams = [...teamsArray];
+        
+        for (let round = 0; round < rounds; round++) {
+            console.log(`🔄 Generando jornada ${currentMatchday}${isSecondLeg ? ' (vuelta)' : ''}`);
+            
+            const roundMatches = [];
+            
+            // Generar partidos para esta jornada usando rotación circular
+            for (let i = 0; i < n / 2; i++) {
+                let homeIndex, awayIndex;
+                
+                if (i === 0) {
+                    // Primer partido: equipo fijo (0) vs equipo rotativo
+                    homeIndex = 0;
+                    awayIndex = n - 1 - round;
+                    if (awayIndex <= 0) awayIndex = n - 1;
+                } else {
+                    // Otros partidos: rotación circular
+                    homeIndex = (round + i) % (n - 1) + 1;
+                    awayIndex = (round + n - 1 - i) % (n - 1) + 1;
+                    
+                    // Ajustar si coincide con el equipo fijo
+                    if (homeIndex >= n) homeIndex = 1;
+                    if (awayIndex >= n) awayIndex = 1;
+                }
+                
+                // Evitar que un equipo juegue contra sí mismo
+                if (homeIndex === awayIndex) continue;
+                
+                const homeTeam = teams[homeIndex];
+                const awayTeam = teams[awayIndex];
+                
+                // Para la segunda vuelta, intercambiar local y visitante
+                const finalHome = isSecondLeg ? awayTeam : homeTeam;
+                const finalAway = isSecondLeg ? homeTeam : awayTeam;
+                
+                const matchData = {
+                    homeTeam: finalHome.name,
+                    awayTeam: finalAway.name,
+                    date: startDate || '2024-01-01',
+                    time: defaultTime || '15:00',
+                    matchday: currentMatchday
+                };
+                
+                roundMatches.push(matchData);
+            }
+            
+            // Agregar partidos de esta jornada
+            roundMatches.forEach(match => {
+                matches.push(match);
+                console.log(`✅ J${currentMatchday}: ${match.homeTeam} vs ${match.awayTeam}`);
+            });
+            
+            currentMatchday++;
+        }
+    }
+    
+    // Primera vuelta
+    generateRoundRobin(teams, false);
+    
+    // Segunda vuelta si está activada
+    if (roundTrip) {
+        console.log('🔄 Generando partidos de vuelta...');
+        generateRoundRobin(teams, true);
+    }
+    
+    const totalJornadas = roundTrip ? 2 * (numTeams - 1) : (numTeams - 1);
+    const partidosPorEquipo = roundTrip ? 2 * (numTeams - 1) : (numTeams - 1);
+    
+    console.log(`🏆 Total partidos generados: ${matches.length}`);
+    console.log(`📊 Jornadas totales: ${totalJornadas}`);
+    console.log(`📊 Partidos por equipo: ${partidosPorEquipo}`);
+    console.log(`📊 Partidos por jornada: ${Math.floor(numTeams / 2)}`);
+    
+    return matches;
+}
+
+
+// ==================== DELETE ALL MATCHES ====================
+
+async function initializeDeleteAllMatches() {
+    console.log('🗑️ Inicializando botón eliminar todos los partidos...');
+    
+    const deleteBtn = document.getElementById('deleteAllMatchesBtn');
+    if (deleteBtn) {
+        deleteBtn.removeEventListener('click', deleteAllMatches);
+        deleteBtn.addEventListener('click', deleteAllMatches);
+        console.log('✅ Event listener agregado al botón eliminar');
+    } else {
+        console.log('❌ Botón eliminar no encontrado');
+    }
+}
+
+async function deleteAllMatches() {
+    console.log('🗑️ deleteAllMatches iniciado');
+    
+    if (!confirm('⚠️ ¿Estás seguro de que quieres eliminar TODOS los partidos? Esta acción no se puede deshacer.')) {
+        console.log('❌ Eliminación cancelada por el usuario');
+        return;
+    }
+    
+    try {
+        showNotification('Eliminando todos los partidos...', 'info');
+        
+        const response = await fetch('/api/matches/delete-all', {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const result = await response.json();
+        console.log('📊 Respuesta del servidor:', result);
+        
+        if (response.ok) {
+            showNotification(`${result.deleted} partidos eliminados exitosamente`, 'success');
+            await loadMatches(); // Recargar la lista de partidos
+        } else {
+            showNotification(result.error || 'Error eliminando partidos', 'error');
+        }
+    } catch (error) {
+        console.error('❌ Error eliminando partidos:', error);
+        showNotification('Error de conexión eliminando partidos', 'error');
+    }
+}
+
 // ==================== CALENDAR MANAGEMENT ====================
 
 async function loadCalendarMatches() {
@@ -2037,74 +2355,150 @@ function renderAllMatches(allMatches) {
         return;
     }
 
-    // Separar partidos por estado
-    const scheduledMatches = allMatches.filter(m => m.status === 'scheduled');
-    const finishedMatches = allMatches.filter(m => m.status === 'finished');
+    const scheduledMatches = allMatches.filter(match => match.status === 'scheduled');
+    const finishedMatches = allMatches.filter(match => match.status === 'finished');
 
-    // Mostrar partidos programados primero
+    // Render scheduled matches organized by matchday
     if (scheduledMatches.length > 0) {
         const pendingTitle = document.createElement('h3');
         pendingTitle.innerHTML = '<i class="fas fa-clock"></i> Partidos Pendientes';
         pendingTitle.style.color = '#00ff88';
-        pendingTitle.style.marginBottom = '20px';
+        pendingTitle.style.marginBottom = '30px';
+        pendingTitle.style.fontSize = '24px';
         resultsGrid.appendChild(pendingTitle);
 
+        // Group scheduled matches by matchday
+        const matchesByMatchday = {};
         scheduledMatches.forEach(match => {
-            const matchCard = document.createElement('div');
-            matchCard.className = 'match-card';
-            matchCard.innerHTML = `
-                <div class="match-teams">${match.homeTeam} vs ${match.awayTeam}</div>
-                <div class="match-info">
-                    <i class="fas fa-calendar"></i> ${match.date} - ${match.time}<br>
-                    <i class="fas fa-futbol"></i> Jornada ${match.matchday}<br>
-                    <i class="fas fa-info-circle"></i> Programado
-                </div>
-                <div class="match-result">
-                    <input type="number" id="homeScore_${match._id}" min="0" placeholder="0" style="width: 60px;">
-                    <span class="vs-text">-</span>
-                    <input type="number" id="awayScore_${match._id}" min="0" placeholder="0" style="width: 60px;">
-                    <button class="btn" onclick="updateMatchResult('${match._id}')">
-                        <i class="fas fa-save"></i> Guardar
-                    </button>
-                </div>
-            `;
-            resultsGrid.appendChild(matchCard);
+            const matchday = match.matchday || 1;
+            if (!matchesByMatchday[matchday]) {
+                matchesByMatchday[matchday] = [];
+            }
+            matchesByMatchday[matchday].push(match);
+        });
+
+        // Sort matchdays numerically
+        const sortedMatchdays = Object.keys(matchesByMatchday).sort((a, b) => parseInt(a) - parseInt(b));
+
+        sortedMatchdays.forEach(matchday => {
+            // Create matchday container
+            const matchdayContainer = document.createElement('div');
+            matchdayContainer.style.cssText = 'margin: 40px 0; border-top: 2px solid #00ff88; border-bottom: 2px solid #00ff88; padding: 20px 0;';
+
+            // Create matchday title
+            const matchdayTitle = document.createElement('h3');
+            matchdayTitle.innerHTML = 'JORNADA ' + matchday;
+            matchdayTitle.style.cssText = 'color: #00ff88; text-align: center; margin: 0 0 25px 0; font-size: 24px; font-weight: bold;';
+            matchdayContainer.appendChild(matchdayTitle);
+
+            // Create matches grid for this matchday
+            const matchdayGrid = document.createElement('div');
+            matchdayGrid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 15px;';
+
+            matchesByMatchday[matchday].forEach(match => {
+                const matchCard = document.createElement('div');
+                matchCard.className = 'match-card';
+                matchCard.innerHTML = `
+                    <div class="match-info">
+                        <h4>${match.homeTeam} vs ${match.awayTeam}</h4>
+                        <p><i class="fas fa-calendar"></i> ${match.date || '2024-01-01'}T${match.time || '00:00:00.000Z'} - undefined</p>
+                        <p><i class="fas fa-info-circle"></i> Programado</p>
+                        <div style="display: flex; align-items: center; gap: 10px; margin-top: 15px;">
+                            <span style="color: #00ff88; font-weight: bold;">${match.homeTeam}:</span>
+                            <input type="number" id="homeScore_${match._id}" min="0" max="99" 
+                                   style="width: 60px; padding: 5px; border: 1px solid #00ff88; border-radius: 4px; background: rgba(255,255,255,0.1); color: white; text-align: center;" 
+                                   placeholder="0">
+                            <span style="color: white; font-weight: bold;">-</span>
+                            <input type="number" id="awayScore_${match._id}" min="0" max="99" 
+                                   style="width: 60px; padding: 5px; border: 1px solid #00ff88; border-radius: 4px; background: rgba(255,255,255,0.1); color: white; text-align: center;" 
+                                   placeholder="0">
+                            <span style="color: #00ff88; font-weight: bold;">${match.awayTeam}</span>
+                        </div>
+                    </div>
+                    <div class="match-actions">
+                        <button class="btn btn-primary" onclick="updateMatchResult('${match._id}')">
+                            <i class="fas fa-save"></i> Guardar Resultado
+                        </button>
+                    </div>
+                `;
+                matchdayGrid.appendChild(matchCard);
+            });
+
+            matchdayContainer.appendChild(matchdayGrid);
+            resultsGrid.appendChild(matchdayContainer);
         });
     }
 
-    // Mostrar partidos finalizados
+    // Render finished matches organized by matchday
     if (finishedMatches.length > 0) {
         const finishedTitle = document.createElement('h3');
         finishedTitle.innerHTML = '<i class="fas fa-check-circle"></i> Partidos Finalizados';
         finishedTitle.style.color = '#00ff88';
-        finishedTitle.style.marginTop = '30px';
-        finishedTitle.style.marginBottom = '20px';
+        finishedTitle.style.marginTop = '40px';
+        finishedTitle.style.marginBottom = '30px';
+        finishedTitle.style.fontSize = '24px';
         resultsGrid.appendChild(finishedTitle);
 
+        // Group finished matches by matchday
+        const finishedByMatchday = {};
         finishedMatches.forEach(match => {
-            const matchCard = document.createElement('div');
-            matchCard.className = 'match-card';
-            matchCard.style.borderColor = 'rgba(0, 255, 136, 0.5)';
-            matchCard.innerHTML = `
-                <div class="match-teams">${match.homeTeam} ${match.homeScore} - ${match.awayScore} ${match.awayTeam}</div>
-                <div class="match-info">
-                    <i class="fas fa-calendar"></i> ${match.date} - ${match.time}<br>
-                    <i class="fas fa-futbol"></i> Jornada ${match.matchday}<br>
-                    <i class="fas fa-check-circle"></i> Finalizado
-                </div>
-                <div class="match-result">
-                    <input type="number" id="homeScore_${match._id}" min="0" value="${match.homeScore}" style="width: 60px;">
-                    <span class="vs-text">-</span>
-                    <input type="number" id="awayScore_${match._id}" min="0" value="${match.awayScore}" style="width: 60px;">
-                    <button class="btn" onclick="updateMatchResult('${match._id}')">
-                        <i class="fas fa-edit"></i> Editar
-                    </button>
-                    <button class="btn btn-danger" onclick="clearMatchResult('${match._id}')">
-                        <i class="fas fa-undo"></i> Eliminar Resultado
-                    </button>
-                </div>
-            `;
-            resultsGrid.appendChild(matchCard);
+            const matchday = match.matchday || 1;
+            if (!finishedByMatchday[matchday]) {
+                finishedByMatchday[matchday] = [];
+            }
+            finishedByMatchday[matchday].push(match);
+        });
+
+        // Sort matchdays numerically
+        const sortedFinishedMatchdays = Object.keys(finishedByMatchday).sort((a, b) => parseInt(a) - parseInt(b));
+
+        sortedFinishedMatchdays.forEach(matchday => {
+            // Create matchday container
+            const matchdayContainer = document.createElement('div');
+            matchdayContainer.style.cssText = 'margin: 40px 0; border-top: 2px solid #28a745; border-bottom: 2px solid #28a745; padding: 20px 0;';
+
+            // Create matchday title
+            const matchdayTitle = document.createElement('h3');
+            matchdayTitle.innerHTML = 'JORNADA ' + matchday + ' - FINALIZADA';
+            matchdayTitle.style.cssText = 'color: #28a745; text-align: center; margin: 0 0 25px 0; font-size: 24px; font-weight: bold;';
+            matchdayContainer.appendChild(matchdayTitle);
+
+            // Create matches grid for this matchday
+            const matchdayGrid = document.createElement('div');
+            matchdayGrid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 15px;';
+
+            finishedByMatchday[matchday].forEach(match => {
+                const matchCard = document.createElement('div');
+                matchCard.className = 'match-card';
+                matchCard.innerHTML = `
+                    <div class="match-info">
+                        <h4>${match.homeTeam} ${match.homeScore || 0} - ${match.awayScore || 0} ${match.awayTeam}</h4>
+                        <p><i class="fas fa-calendar"></i> ${match.date || '2024-01-01'}T${match.time || '00:00:00.000Z'} - undefined</p>
+                        <p><i class="fas fa-check-circle"></i> Finalizado</p>
+                        <div style="display: flex; align-items: center; gap: 10px; margin-top: 15px;">
+                            <span style="color: #28a745; font-weight: bold;">${match.homeTeam}:</span>
+                            <input type="number" id="homeScore_${match._id}" min="0" max="99" value="${match.homeScore || 0}"
+                                   style="width: 60px; padding: 5px; border: 1px solid #28a745; border-radius: 4px; background: rgba(255,255,255,0.1); color: white; text-align: center;">
+                            <span style="color: white; font-weight: bold;">-</span>
+                            <input type="number" id="awayScore_${match._id}" min="0" max="99" value="${match.awayScore || 0}"
+                                   style="width: 60px; padding: 5px; border: 1px solid #28a745; border-radius: 4px; background: rgba(255,255,255,0.1); color: white; text-align: center;">
+                            <span style="color: #28a745; font-weight: bold;">${match.awayTeam}</span>
+                        </div>
+                    </div>
+                    <div class="match-actions">
+                        <button class="btn btn-secondary" onclick="updateMatchResult('${match._id}')" style="margin-right: 10px;">
+                            <i class="fas fa-edit"></i> Editar Resultado
+                        </button>
+                        <button class="btn btn-danger" onclick="removeMatchResult('${match._id}')" style="background: #dc3545; border: none; padding: 8px 16px; border-radius: 4px; color: white; cursor: pointer;">
+                            <i class="fas fa-trash"></i> Eliminar Resultado
+                        </button>
+                    </div>
+                `;
+                matchdayGrid.appendChild(matchCard);
+            });
+
+            matchdayContainer.appendChild(matchdayGrid);
+            resultsGrid.appendChild(matchdayContainer);
         });
     }
 }
@@ -2145,6 +2539,40 @@ async function updateMatchResult(matchId) {
         }
     } catch (error) {
         console.error('Error updating match result:', error);
+        showNotification('Error de conexión', 'error');
+    }
+}
+
+// Función para eliminar resultado de un partido
+async function removeMatchResult(matchId) {
+    if (!confirm('¿Estás seguro de que quieres eliminar el resultado de este partido?\n\nEl partido volverá al estado "Programado".')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/matches/${matchId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                homeScore: null,
+                awayScore: null,
+                status: 'scheduled'
+            })
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            showNotification('Resultado eliminado exitosamente', 'success');
+            await loadMatches();
+            loadPendingMatches();
+        } else {
+            showNotification(result.error || 'Error eliminando resultado', 'error');
+        }
+    } catch (error) {
+        console.error('Error removing match result:', error);
         showNotification('Error de conexión', 'error');
     }
 }
@@ -2211,179 +2639,40 @@ async function clearMatchResult(matchId) {
 }
 
 // ==================== CONFIGURATION MANAGEMENT ====================
-
-let classificationZones = [];
+// (Sistema de zonas de clasificación eliminado)
 
 async function loadConfiguration() {
     try {
         console.log('🔧 Cargando configuración desde MongoDB...');
         
-        // Cargar zonas de clasificación desde el endpoint específico
-        const zonesResponse = await fetch('/api/settings/classification-zones');
-        
-        if (zonesResponse.ok) {
-            const zonesData = await zonesResponse.json();
+        // Cargar configuraciones del endpoint general
+        const settingsResponse = await fetch('/api/settings');
+        if (settingsResponse.ok) {
+            const settings = await settingsResponse.json();
             
-            if (zonesData.success && zonesData.classificationZones) {
-                classificationZones = zonesData.classificationZones;
-                console.log('✅ Zonas de clasificación cargadas desde MongoDB:', classificationZones.length);
-            } else {
-                console.warn('⚠️ No se encontraron zonas en MongoDB, usando por defecto');
-                classificationZones = [
-                    { id: 1, name: 'Clasificación Directa', positions: '1-4', color: '#00ff88' },
-                    { id: 2, name: 'Repechaje', positions: '5-8', color: '#ffa500' },
-                    { id: 3, name: 'Eliminación', positions: '9-12', color: '#ff4757' }
-                ];
-            }
-        } else {
-            throw new Error(`Error ${zonesResponse.status}: ${zonesResponse.statusText}`);
-        }
-        
-        // Renderizar las zonas cargadas
-        renderClassificationZones();
-        
-        // Cargar otras configuraciones del endpoint general
-        try {
-            const settingsResponse = await fetch('/api/settings');
-            if (settingsResponse.ok) {
-                const settings = await settingsResponse.json();
-                document.getElementById('seasonName').value = settings.seasonName || 'Temporada 2025';
-                document.getElementById('pointsWin').value = settings.pointsWin || 3;
-                document.getElementById('pointsDraw').value = settings.pointsDraw || 1;
-                document.getElementById('playoffFormat').value = settings.playoffFormat || '8';
-            }
-        } catch (settingsError) {
-            console.warn('⚠️ Error cargando configuraciones generales:', settingsError);
+            // Cargar configuraciones del torneo
+            document.getElementById('seasonName').value = settings.seasonName || 'Temporada 2025';
+            document.getElementById('playoffFormat').value = settings.playoffFormat || '8';
         }
         
     } catch (error) {
         console.error('❌ Error loading configuration:', error);
-        
-        // Solo usar zonas por defecto si hay un error real de conexión
-        console.warn('⚠️ Usando zonas por defecto debido a error de conexión');
-        classificationZones = [
-            { id: 1, name: 'Clasificación Directa', positions: '1-4', color: '#00ff88' },
-            { id: 2, name: 'Repechaje', positions: '5-8', color: '#ffa500' },
-            { id: 3, name: 'Eliminación', positions: '9-12', color: '#ff4757' }
-        ];
-        renderClassificationZones();
     }
 }
 
-function renderClassificationZones() {
-    console.log('🎨 INICIANDO RENDERIZADO DE ZONAS DE CLASIFICACIÓN...');
-    console.log('📊 Zonas a renderizar:', classificationZones.length, classificationZones);
-    
-    const container = document.getElementById('classificationZones');
-    console.log('📦 Contenedor encontrado:', !!container, container);
-    
-    if (!container) {
-        console.error('❌ CONTENEDOR #classificationZones NO ENCONTRADO!');
-        return;
-    }
-    
-    container.innerHTML = '';
-    console.log('🧹 Contenedor limpiado');
-    
-    classificationZones.forEach((zone, index) => {
-        console.log(`🎯 Renderizando zona ${index + 1}:`, zone);
-        const zoneDiv = document.createElement('div');
-        zoneDiv.className = 'zone-config'; // ✅ CLASE AGREGADA PARA COMPATIBILIDAD CON GUARDADO
-        zoneDiv.style.cssText = `
-            background: rgba(255, 255, 255, 0.05);
-            border: 2px solid rgba(0, 255, 136, 0.3);
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 15px;
-            display: grid;
-            grid-template-columns: 1fr 1fr 80px 50px;
-            gap: 15px;
-            align-items: center;
-        `;
-        
-        zoneDiv.innerHTML = `
-            <div class="form-group" style="margin: 0;">
-                <label style="color: #00ff88; font-size: 14px;">Nombre de la Zona</label>
-                <input type="text" value="${zone.name}" onchange="updateZone(${zone.id}, 'name', this.value)" 
-                       style="background: rgba(255,255,255,0.1); border: 1px solid rgba(0,255,136,0.3); color: white; padding: 8px; border-radius: 4px; width: 100%;">
-            </div>
-            <div class="form-group" style="margin: 0;">
-                <label style="color: #00ff88; font-size: 14px;">Posiciones</label>
-                <input type="text" value="${zone.positions}" onchange="updateZone(${zone.id}, 'positions', this.value)" 
-                       placeholder="1-4" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(0,255,136,0.3); color: white; padding: 8px; border-radius: 4px; width: 100%;">
-            </div>
-            <div class="form-group" style="margin: 0;">
-                <label style="color: #00ff88; font-size: 14px;">Color</label>
-                <input type="color" value="${zone.color}" onchange="updateZone(${zone.id}, 'color', this.value)" 
-                       style="width: 100%; height: 40px; border: none; border-radius: 4px; cursor: pointer;">
-            </div>
-            <button onclick="removeZone(${zone.id})" 
-                    style="background: #ff4757; border: none; color: white; padding: 8px; border-radius: 4px; cursor: pointer; height: 40px;">
-                <i class="fas fa-trash"></i>
-            </button>
-        `;
-        
-        container.appendChild(zoneDiv);
-        console.log(`✅ Zona ${index + 1} agregada al DOM`);
-    });
-    
-    console.log(`✅ RENDERIZADO COMPLETADO: ${classificationZones.length} zonas agregadas al DOM`);
-    console.log('📦 Estado final del contenedor:', container.children.length, 'elementos');
-}
+// Función de renderizado de zonas eliminada
 
-function addClassificationZone() {
-    const newId = Math.max(...classificationZones.map(z => z.id), 0) + 1;
-    const newZone = {
-        id: newId,
-        name: 'Nueva Zona',
-        positions: '1-2',
-        color: '#00ff88'
-    };
-    
-    classificationZones.push(newZone);
-    renderClassificationZones();
-}
+// Función de agregar zona eliminada
 
-function updateZone(id, field, value) {
-    const zone = classificationZones.find(z => z.id === id);
-    if (zone) {
-        zone[field] = value;
-    }
-}
+// Función de limpiar zonas eliminada
 
-function removeZone(id) {
-    if (classificationZones.length <= 1) {
-        showNotification('Debe haber al menos una zona de clasificación', 'error');
-        return;
-    }
-    
-    if (confirm('¿Estás seguro de que quieres eliminar esta zona?')) {
-        classificationZones = classificationZones.filter(z => z.id !== id);
-        renderClassificationZones();
-    }
-}
+// Función de actualizar zona eliminada
 
-async function saveTableConfig() {
-    try {
-        const response = await fetch('/api/settings/classification-zones', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ classificationZones })
-        });
-        
-        if (response.ok) {
-            showNotification('Zonas de clasificación guardadas exitosamente', 'success');
-        } else {
-            const error = await response.json();
-            showNotification(error.error || 'Error guardando configuración', 'error');
-        }
-    } catch (error) {
-        console.error('Error saving classification zones:', error);
-        showNotification('Error de conexión', 'error');
-    }
-}
+// Función de remover zona eliminada
+
+// Función helper de zonas eliminada
+
+// Función de guardar configuración de tabla eliminada
 
 async function saveTournamentConfig() {
     const tournamentConfig = {
@@ -3900,8 +4189,8 @@ window.showManualSelection = showManualSelection;
 window.createManualBracket = createManualBracket;
 window.clearBracket = clearBracket;
 window.addClassificationZone = addClassificationZone;
-window.updateZone = updateZone;
-window.removeZone = removeZone;
+// window.updateZone = updateZone; // Function removed
+// window.removeZone = removeZone; // Function removed
 window.updatePlayoffMatch = updatePlayoffMatch;
 window.clearPlayoffMatch = clearPlayoffMatch;
 window.editPlayerQuick = editPlayerQuick;
@@ -4043,10 +4332,260 @@ function populateClubSelects() {
     console.log('populateClubSelects llamada - no es necesaria en el diseño actual');
 }
 
-// Función para editar equipo (función faltante)
+// Función para editar equipo
 function editTeam(teamId) {
-    console.log('Función editTeam no implementada para teamId:', teamId);
-    showNotification('Función de editar equipo no disponible', 'info');
+    console.log('🔧 Editando equipo:', teamId);
+    
+    const team = teams.find(t => (t._id || t.id) === teamId);
+    if (!team) {
+        showNotification('Equipo no encontrado', 'error');
+        return;
+    }
+
+    // Crear modal de edición
+    const modal = document.createElement('div');
+    modal.id = 'editTeamModal';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+    `;
+
+    modal.innerHTML = `
+        <div style="
+            background: #1a1a1a;
+            border: 2px solid #00ff88;
+            border-radius: 15px;
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 20px 40px rgba(0, 255, 136, 0.3);
+        ">
+            <h2 style="color: #00ff88; margin: 0 0 25px 0; text-align: center;">
+                <i class="fas fa-edit"></i> Editar Equipo
+            </h2>
+            
+            <div style="margin-bottom: 20px;">
+                <label style="color: white; display: block; margin-bottom: 8px; font-weight: bold;">
+                    <i class="fas fa-tag"></i> Nombre del Equipo:
+                </label>
+                <input type="text" id="editTeamName" value="${team.name}" style="
+                    width: 100%;
+                    padding: 12px;
+                    border: 2px solid rgba(0, 255, 136, 0.3);
+                    border-radius: 8px;
+                    background: rgba(255, 255, 255, 0.1);
+                    color: white;
+                    font-size: 16px;
+                    outline: none;
+                    box-sizing: border-box;
+                " placeholder="Ingresa el nombre del equipo">
+            </div>
+
+            <div style="margin-bottom: 25px;">
+                <label style="color: white; display: block; margin-bottom: 8px; font-weight: bold;">
+                    <i class="fas fa-image"></i> Logo del Equipo:
+                </label>
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <div style="
+                        width: 80px;
+                        height: 80px;
+                        border-radius: 8px;
+                        overflow: hidden;
+                        background: rgba(0,255,136,0.1);
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        border: 2px solid rgba(0, 255, 136, 0.3);
+                    ">
+                        ${team.logo ? 
+                            `<img id="editTeamLogoPreview" src="${team.logo}" alt="Logo" style="width: 100%; height: 100%; object-fit: cover;">` :
+                            `<i id="editTeamLogoPreview" class="fas fa-users" style="color: #00ff88; font-size: 32px;"></i>`
+                        }
+                    </div>
+                    <div style="flex: 1;">
+                        <input type="file" id="editTeamLogoFile" accept="image/*" style="display: none;">
+                        <button onclick="document.getElementById('editTeamLogoFile').click()" style="
+                            background: #00ff88;
+                            color: #0a0a0a;
+                            border: none;
+                            padding: 10px 20px;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            font-weight: bold;
+                            margin-bottom: 10px;
+                            width: 100%;
+                        ">
+                            <i class="fas fa-upload"></i> Cambiar Logo
+                        </button>
+                        <button onclick="removeTeamLogo()" style="
+                            background: #ff4444;
+                            color: white;
+                            border: none;
+                            padding: 8px 16px;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            font-size: 14px;
+                            width: 100%;
+                        ">
+                            <i class="fas fa-trash"></i> Quitar Logo
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 15px; justify-content: center;">
+                <button onclick="saveTeamChanges('${teamId}')" style="
+                    background: #00ff88;
+                    color: #0a0a0a;
+                    border: none;
+                    padding: 12px 25px;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-weight: bold;
+                    font-size: 16px;
+                ">
+                    <i class="fas fa-save"></i> Guardar Cambios
+                </button>
+                <button onclick="cancelTeamEdit()" style="
+                    background: #666;
+                    color: white;
+                    border: none;
+                    padding: 12px 25px;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-weight: bold;
+                    font-size: 16px;
+                ">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Agregar event listener para preview del logo
+    const fileInput = document.getElementById('editTeamLogoFile');
+    fileInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const preview = document.getElementById('editTeamLogoPreview');
+                if (preview.tagName === 'IMG') {
+                    preview.src = e.target.result;
+                } else {
+                    // Reemplazar el icono con una imagen
+                    preview.outerHTML = `<img id="editTeamLogoPreview" src="${e.target.result}" alt="Logo" style="width: 100%; height: 100%; object-fit: cover;">`;
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
+    // Focus en el input de nombre
+    setTimeout(() => {
+        document.getElementById('editTeamName').focus();
+    }, 100);
+}
+
+// Función para guardar cambios del equipo
+async function saveTeamChanges(teamId) {
+    const nameInput = document.getElementById('editTeamName');
+    const fileInput = document.getElementById('editTeamLogoFile');
+    
+    if (!nameInput) {
+        showNotification('Error: No se pudo encontrar el campo de nombre', 'error');
+        return;
+    }
+
+    const newName = nameInput.value.trim();
+    if (!newName) {
+        showNotification('El nombre del equipo no puede estar vacío', 'error');
+        return;
+    }
+
+    try {
+        showNotification('Guardando cambios...', 'info');
+        
+        // Verificar si se debe eliminar el logo
+        const preview = document.getElementById('editTeamLogoPreview');
+        const shouldRemoveLogo = preview && preview.hasAttribute('data-remove-logo');
+        
+        // Crear FormData para enviar tanto el nombre como el logo (si existe)
+        const formData = new FormData();
+        formData.append('name', newName);
+        
+        // Si hay un archivo seleccionado, agregarlo al FormData
+        if (fileInput && fileInput.files[0]) {
+            formData.append('logo', fileInput.files[0]);
+        } else if (shouldRemoveLogo) {
+            // Enviar una cadena vacía para indicar que se debe eliminar el logo
+            formData.append('removeLogo', 'true');
+        }
+
+        // Actualizar el equipo usando el endpoint existente
+        const response = await fetch(`/api/teams/${teamId}`, {
+            method: 'PUT',
+            body: formData // Usar FormData en lugar de JSON
+        });
+
+        if (response.ok) {
+            const updatedTeam = await response.json();
+            
+            // Actualizar el equipo en el array local
+            const teamIndex = teams.findIndex(t => (t._id || t.id) === teamId);
+            if (teamIndex !== -1) {
+                teams[teamIndex] = { ...teams[teamIndex], ...updatedTeam };
+            }
+            
+            showNotification('Equipo actualizado exitosamente', 'success');
+            cancelTeamEdit();
+            forceRenderTeams();
+            loadTeamTabs(); // Actualizar pestañas si el nombre cambió
+        } else {
+            const error = await response.json();
+            throw new Error(error.message || 'Error al actualizar el equipo');
+        }
+    } catch (error) {
+        console.error('Error saving team changes:', error);
+        showNotification('Error al guardar cambios: ' + error.message, 'error');
+    }
+}
+
+// Función para cancelar edición del equipo
+function cancelTeamEdit() {
+    const modal = document.getElementById('editTeamModal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+// Función para quitar logo del equipo
+function removeTeamLogo() {
+    const preview = document.getElementById('editTeamLogoPreview');
+    if (preview) {
+        if (preview.tagName === 'IMG') {
+            // Reemplazar imagen con icono y marcar para eliminación
+            preview.outerHTML = `<i id="editTeamLogoPreview" class="fas fa-users" style="color: #00ff88; font-size: 32px;" data-remove-logo="true"></i>`;
+        }
+        
+        // Limpiar el input de archivo
+        const fileInput = document.getElementById('editTeamLogoFile');
+        if (fileInput) {
+            fileInput.value = '';
+        }
+        
+        showNotification('Logo removido (se guardará al confirmar cambios)', 'info');
+    }
 }
 
 // Editar jugador (versión rápida)
@@ -4195,7 +4734,20 @@ window.populateClubSelects = populateClubSelects;
 
 // Funciones de partidos
 window.deleteMatch = deleteMatch;
-window.updateMatchResult = updateMatchResult;
+
+
+
+// Sistema de Copa de la Liga eliminado
+
+// Función de Copa eliminada
+
+// Función de grupos eliminada
+
+// Función de eliminatorias eliminada
+
+// Función eliminada
+
+// Referencias a Copa eliminadas
 
 // Funciones de clips
 window.deleteClip = deleteClip;
@@ -4941,9 +5493,14 @@ function addEditButtonsToTeams() {
 
 // Funciones de equipos
 window.editTeam = editTeam;
-// window.deleteTeam ya está definido al inicio del archivo
+window.saveTeamChanges = saveTeamChanges;
 window.cancelTeamEdit = cancelTeamEdit;
+window.removeTeamLogo = removeTeamLogo;
+// window.deleteTeam ya está definido al inicio del archivo
 window.addEditButtonsToTeams = addEditButtonsToTeams;
+
+// Funciones de partidos
+window.removeMatchResult = removeMatchResult;
 
 // Función de limpieza de MongoDB
 window.cleanupMongoDB = async function() {
@@ -5111,7 +5668,7 @@ function loadTeamTabs() {
     teamTabs.innerHTML = teams.map((team, index) => `
         <button class="team-tab ${index === 0 ? 'active' : ''}" 
                 data-team-id="${team._id || team.id}" 
-                onclick="selectTeamTab('${team._id || team.id}')">
+                onclick="selectTeam('${team._id || team.id}', '${team.name}')">
             ${team.name}
         </button>
     `).join('');
@@ -5119,7 +5676,8 @@ function loadTeamTabs() {
     // Cargar jugadores del primer equipo automáticamente
     if (teams.length > 0) {
         const firstTeamId = teams[0]._id || teams[0].id;
-        loadTeamPlayers(firstTeamId);
+        const firstTeamName = teams[0].name;
+        selectTeam(firstTeamId, firstTeamName);
     }
     
     console.log('✅ Pestañas de equipos cargadas:', teams.length);
@@ -5170,12 +5728,244 @@ function deleteMatch(matchId) {
     });
 }
 
+// Funciones de Copa eliminadas
+
+// Función eliminada
+
+// Render Copa groups
+function renderCopaGroups() {
+    const groupsContainer = document.getElementById('copaGroupsDisplay');
+    if (!groupsContainer) return;
+    
+    if (!copaData || !copaData.groups) {
+        groupsContainer.innerHTML = '<p style="color: rgba(255,255,255,0.6); text-align: center;">No hay grupos configurados</p>';
+        return;
+    }
+    
+    let groupsHTML = '';
+    
+    ['A', 'B', 'C', 'D'].forEach(groupKey => {
+        const group = copaData.groups[groupKey];
+        
+        groupsHTML += `
+            <div style="background: rgba(0,0,0,0.3); padding: 20px; border-radius: 10px;">
+                <h4 style="color: #00ff88; margin-bottom: 15px; text-align: center;">Grupo ${groupKey}</h4>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                        <thead>
+                            <tr style="border-bottom: 2px solid #00ff88;">
+                                <th style="padding: 8px; text-align: left; color: #00ff88;">Equipo</th>
+                                <th style="padding: 8px; text-align: center; color: #00ff88;">PJ</th>
+                                <th style="padding: 8px; text-align: center; color: #00ff88;">Pts</th>
+                                <th style="padding: 8px; text-align: center; color: #00ff88;">DG</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+        `;
+        
+        if (group && group.length > 0) {
+            group.forEach((team, index) => {
+                const qualification = index < 2 ? 'style="background: rgba(0,255,136,0.1);"' : '';
+                groupsHTML += `
+                    <tr ${qualification}>
+                        <td style="padding: 8px; color: white;">${team.name}</td>
+                        <td style="padding: 8px; text-align: center; color: white;">${team.played}</td>
+                        <td style="padding: 8px; text-align: center; color: white; font-weight: bold;">${team.points}</td>
+                        <td style="padding: 8px; text-align: center; color: white;">${team.goalDifference > 0 ? '+' : ''}${team.goalDifference}</td>
+                    </tr>
+                `;
+            });
+        } else {
+            groupsHTML += `
+                <tr>
+                    <td colspan="4" style="padding: 20px; text-align: center; color: rgba(255,255,255,0.6);">
+                        No hay equipos en este grupo
+                    </td>
+                </tr>
+            `;
+        }
+        
+        groupsHTML += `
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+    });
+    
+    groupsContainer.innerHTML = groupsHTML;
+}
+
+// Render Copa knockout
+function renderCopaKnockout() {
+    const knockoutContainer = document.getElementById('copaKnockoutDisplay');
+    if (!knockoutContainer) return;
+    
+    if (!copaData || !copaData.knockout) {
+        knockoutContainer.innerHTML = '<p style="color: rgba(255,255,255,0.6); text-align: center;">No hay eliminatorias configuradas</p>';
+        return;
+    }
+    
+    const knockout = copaData.knockout;
+    
+    let knockoutHTML = `
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-top: 20px;">
+            <!-- Cuartos de Final -->
+            <div>
+                <h4 style="color: #00ff88; text-align: center; margin-bottom: 15px;">Cuartos de Final</h4>
+    `;
+    
+    if (knockout.quarterfinals && knockout.quarterfinals.length > 0) {
+        knockout.quarterfinals.forEach((match, index) => {
+            const scoreDisplay = match.status === 'finished' ? 
+                `${match.score1} - ${match.score2}` : 
+                (match.team1 && match.team2 ? 'vs' : 'TBD');
+            
+            knockoutHTML += `
+                <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; margin-bottom: 10px; text-align: center;">
+                    <div style="color: white; font-weight: bold;">${match.team1 || 'TBD'}</div>
+                    <div style="color: #00ff88; margin: 5px 0;">${scoreDisplay}</div>
+                    <div style="color: white; font-weight: bold;">${match.team2 || 'TBD'}</div>
+                    ${match.status === 'finished' ? `<div style="color: #ffaa00; font-size: 12px; margin-top: 5px;">Ganador: ${match.winner}</div>` : ''}
+                </div>
+            `;
+        });
+    } else {
+        knockoutHTML += '<p style="color: rgba(255,255,255,0.6); text-align: center;">No configurado</p>';
+    }
+    
+    knockoutHTML += `
+            </div>
+            <!-- Semifinales -->
+            <div>
+                <h4 style="color: #00ff88; text-align: center; margin-bottom: 15px;">Semifinales</h4>
+    `;
+    
+    if (knockout.semifinals && knockout.semifinals.length > 0) {
+        knockout.semifinals.forEach((match, index) => {
+            const scoreDisplay = match.status === 'finished' ? 
+                `${match.score1} - ${match.score2}` : 
+                (match.team1 && match.team2 ? 'vs' : 'TBD');
+            
+            knockoutHTML += `
+                <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; margin-bottom: 10px; text-align: center;">
+                    <div style="color: white; font-weight: bold;">${match.team1 || 'TBD'}</div>
+                    <div style="color: #00ff88; margin: 5px 0;">${scoreDisplay}</div>
+                    <div style="color: white; font-weight: bold;">${match.team2 || 'TBD'}</div>
+                    ${match.status === 'finished' ? `<div style="color: #ffaa00; font-size: 12px; margin-top: 5px;">Ganador: ${match.winner}</div>` : ''}
+                </div>
+            `;
+        });
+    } else {
+        knockoutHTML += '<p style="color: rgba(255,255,255,0.6); text-align: center;">No configurado</p>';
+    }
+    
+    knockoutHTML += `
+            </div>
+            <!-- Final -->
+            <div>
+                <h4 style="color: #00ff88; text-align: center; margin-bottom: 15px;">Final</h4>
+    `;
+    
+    if (knockout.final) {
+        const match = knockout.final;
+        const scoreDisplay = match.status === 'finished' ? 
+            `${match.score1} - ${match.score2}` : 
+            (match.team1 && match.team2 ? 'vs' : 'TBD');
+        
+        knockoutHTML += `
+            <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; text-align: center;">
+                <div style="color: white; font-weight: bold;">${match.team1 || 'TBD'}</div>
+                <div style="color: #00ff88; margin: 5px 0;">${scoreDisplay}</div>
+                <div style="color: white; font-weight: bold;">${match.team2 || 'TBD'}</div>
+                ${match.status === 'finished' ? `<div style="color: #ffaa00; font-size: 12px; margin-top: 5px;">🏆 Campeón: ${match.winner}</div>` : ''}
+            </div>
+        `;
+    } else {
+        knockoutHTML += '<p style="color: rgba(255,255,255,0.6); text-align: center;">No configurado</p>';
+    }
+    
+    knockoutHTML += `
+            </div>
+        </div>
+    `;
+    
+    knockoutContainer.innerHTML = knockoutHTML;
+}
+
+// Generate Copa groups (admin function)
+async function generateCopaGroupsAdmin() {
+    if (!confirm('¿Generar grupos automáticamente? Esto sobrescribirá los grupos existentes.')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/copa/generate-groups', {
+            method: 'POST'
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            copaData = result.copa;
+            
+            showNotification('Grupos generados exitosamente', 'success');
+            
+            // Refresh displays
+            renderCopaStatus();
+            renderCopaGroups();
+            updateGroupTeamSelects();
+            
+        } else {
+            const error = await response.json();
+            showNotification(error.error || 'Error generando grupos', 'error');
+        }
+    } catch (error) {
+        console.error('❌ Error generando grupos:', error);
+        showNotification('Error de conexión', 'error');
+    }
+}
+
+// Advance to knockout stage (admin function)
+async function advanceToKnockoutAdmin() {
+    if (!confirm('¿Avanzar a fase eliminatoria? Esto configurará los cuartos de final automáticamente.')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/copa/advance-knockout', {
+            method: 'POST'
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            copaData = result.copa;
+            
+            showNotification('Avanzado a fase eliminatoria exitosamente', 'success');
+            
+            // Refresh displays
+            renderCopaStatus();
+            renderCopaKnockout();
+            updateKnockoutMatchSelect();
+            
+        } else {
+            const error = await response.json();
+            showNotification(error.error || 'Error avanzando a eliminatoria', 'error');
+        }
+    } catch (error) {
+        console.error('❌ Error avanzando a eliminatoria:', error);
+        showNotification('Error de conexión', 'error');
+    }
+}
+
+
+// Referencias a Copa eliminadas
+
 // ==================== CONFIGURACIÓN DE ZONAS DE CLASIFICACIÓN ====================
 
 // Función para guardar configuración de zonas de clasificación
 async function saveTableConfig() {
     try {
-        console.log('🎯 INICIANDO GUARDADO DE ZONAS DE CLASIFICACIÓN...');
+        console.log('🎯 INICIANDO GUARDADO DE CONFIGURACIÓN...');
         
         // Obtener todas las zonas de clasificación del contenedor correcto
         const zonesContainer = document.getElementById('classificationZones');
@@ -5211,10 +6001,10 @@ async function saveTableConfig() {
             }
         });
         
-        console.log('📋 Zonas de clasificación a guardar:', classificationZones);
+        console.log('📋 Configuración a guardar:', classificationZones);
         
         if (classificationZones.length === 0) {
-            showNotification('No hay zonas de clasificación para guardar', 'warning');
+            showNotification('No hay configuración para guardar', 'warning');
             return;
         }
         
@@ -5242,7 +6032,7 @@ async function saveTableConfig() {
         const data = await response.json();
         
         if (data.success) {
-            console.log('✅ Zonas de clasificación guardadas exitosamente:', data);
+            console.log('✅ Configuración guardada exitosamente:', data);
             showNotification('Configuración guardada correctamente', 'success');
         } else {
             throw new Error(data.error || 'Error desconocido');
@@ -5280,8 +6070,10 @@ async function loadTableConfig() {
     }
 }
 
-// Función para renderizar la configuración en el contenedor correcto
+// Función para renderizar la configuración directamente desde MongoDB
 function renderTableConfig(zones) {
+    console.log('🔄 Renderizando zonas directamente desde MongoDB');
+    
     const container = document.getElementById('classificationZones');
     if (!container) {
         console.error('❌ No se encontró classificationZones');
@@ -5295,7 +6087,7 @@ function renderTableConfig(zones) {
         zoneDiv.className = 'zone-config';
         zoneDiv.style.cssText = `
             display: grid;
-            grid-template-columns: 2fr 1fr 100px;
+            grid-template-columns: 2fr 1fr 100px 80px;
             gap: 15px;
             align-items: center;
             background: rgba(255, 255, 255, 0.1);
@@ -5348,7 +6140,7 @@ function addClassificationZone() {
         <input type="color" value="#00ff88" 
                style="width: 50px; height: 35px; border: none; border-radius: 4px; cursor: pointer;">
         <button onclick="this.parentElement.remove()" 
-                style="background: #ff4757; border: none; color: white; padding: 8px; border-radius: 4px; cursor: pointer;">
+                style="background: #ff4757; color: white; border: none; padding: 6px 10px; border-radius: 3px; cursor: pointer; font-size: 12px;">
             <i class="fas fa-trash"></i>
         </button>
     `;
@@ -5367,11 +6159,88 @@ function initializeClassificationZones() {
 
 // Exponer funciones globalmente
 window.saveTableConfig = saveTableConfig;
-window.loadTableConfig = loadTableConfig;
-window.addClassificationZone = addClassificationZone;
 
 console.log('✅ Funciones globales expuestas correctamente');
 
 // Inicializar zonas de clasificación automáticamente
 // REMOVIDO: setTimeout para evitar timing inconsistente
 // Las zonas se cargarán cuando se acceda a la pestaña config
+
+// ==================== FUNCIÓN SWITCHTAB ACTUALIZADA ====================
+
+// Función para cambiar entre pestañas del admin
+function switchTab(tabName) {
+    console.log('🔄 Cambiando a pestaña:', tabName);
+    
+    // Ocultar todas las secciones
+    const sections = document.querySelectorAll('.admin-section');
+    sections.forEach(section => {
+        section.classList.remove('active');
+        section.style.display = 'none';
+    });
+    
+    // Remover clase active de todos los botones de pestaña
+    const tabButtons = document.querySelectorAll('.admin-tab-btn');
+    tabButtons.forEach(btn => btn.classList.remove('active'));
+    
+    // Mostrar la sección correspondiente
+    const targetSection = document.getElementById(tabName);
+    if (targetSection) {
+        targetSection.classList.add('active');
+        targetSection.style.display = 'block';
+    }
+    
+    // Activar el botón de pestaña correspondiente
+    const activeButton = document.querySelector(`[data-tab="${tabName}"]`);
+    if (activeButton) {
+        activeButton.classList.add('active');
+    }
+    
+    // Cargar contenido específico según la pestaña
+    switch (tabName) {
+        case 'teams':
+            loadTeams();
+            break;
+        case 'clubs':
+            loadClubs();
+            break;
+        case 'matches':
+            loadMatches();
+            populateTeamSelects();
+            console.log('🔄 Ejecutando initializeMatchGeneration desde switchTab...');
+            setTimeout(() => {
+                initializeMatchGeneration();
+                initializeDeleteAllMatches();
+            }, 500);
+            initializeMatchGeneration();
+            initializeDeleteAllMatches();
+            break;
+        case 'results':
+            loadPendingMatches();
+            break;
+        case 'config':
+            loadTableConfig();
+            break;
+        case 'players':
+            loadTeamTabs();
+            setupPlayerEventListeners();
+            break;
+        case 'playoffs':
+            // Cargar playoffs si es necesario
+            break;
+        case 'clips':
+            loadAllClips();
+            break;
+        default:
+            console.warn('⚠️ Pestaña no reconocida:', tabName);
+    }
+}
+
+// Exponer función switchTab globalmente
+window.switchTab = switchTab;
+
+// Exponer funciones globalmente para que funcionen desde HTML
+window.selectTeam = selectTeam;
+window.loadTeamTabs = loadTeamTabs;
+window.setupPlayerEventListeners = setupPlayerEventListeners;
+window.addPlayerQuick = addPlayerQuick;

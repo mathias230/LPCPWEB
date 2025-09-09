@@ -644,6 +644,11 @@ io.on('connection', (socket) => {
     
     socket.emit('statsUpdate', stats);
     
+    socket.on('classificationZonesChanged', (zones) => {
+        console.log('📡 Recibido evento classificationZonesChanged, broadcasting a todos los clientes');
+        socket.broadcast.emit('classificationZonesUpdate', zones);
+    });
+
     socket.on('disconnect', () => {
         console.log('Usuario desconectado:', socket.id);
     });
@@ -679,12 +684,12 @@ app.get('/api/classification-zones', async (req, res) => {
             console.log('✅ Zonas de clasificación por defecto creadas en MongoDB');
         }
         
-        console.log('🏆 Zonas de clasificación cargadas:', zones.length);
+        console.log('🏆 Datos cargados:', zones.length);
         res.json(zones);
         
     } catch (error) {
-        console.error('❌ Error cargando zonas de clasificación:', error);
-        res.status(500).json({ error: 'Error cargando zonas de clasificación' });
+        console.error('❌ Error cargando datos:', error);
+        res.status(500).json({ error: 'Error cargando datos' });
     }
 });
 

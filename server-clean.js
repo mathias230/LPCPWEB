@@ -141,6 +141,8 @@ const SettingsSchema = new mongoose.Schema({
     updatedAt: { type: Date, default: Date.now }
 });
 
+// Copa schema eliminado
+
 // Esquema para Clips (solo metadatos, videos en Cloudinary)
 const ClipSchema = new mongoose.Schema({
     title: { type: String, required: true },
@@ -166,6 +168,7 @@ const Match = mongoose.model('Match', MatchSchema);
 const TournamentSettings = mongoose.model('TournamentSettings', TournamentSettingsSchema);
 const Settings = mongoose.model('Settings', SettingsSchema);
 const Clip = mongoose.model('Clip', ClipSchema);
+// Modelo Copa eliminado
 
 // ==================== FUNCIONES MONGODB PARA CLIPS ====================
 
@@ -209,12 +212,37 @@ initializeClips();
 
 // ==================== ENDPOINTS MONGODB ====================
 
-// ==================== MATCHES ENDPOINTS ====================
+// ==================== MATCH ROUTES ====================
+
+// Delete all matches (debe ir ANTES del endpoint /:id)
+app.delete('/api/matches/delete-all', async (req, res) => {
+    try {
+        console.log('🗑️ Eliminando todos los partidos...');
+        
+        const result = await Match.deleteMany({});
+        console.log(`✅ ${result.deletedCount} partidos eliminados`);
+        
+        // Emit WebSocket event
+        const allMatches = await Match.find().sort({ date: 1 });
+        io.emit('matchesUpdate', allMatches);
+        io.emit('matchesDeleted', { deleted: result.deletedCount });
+        
+        res.json({ 
+            success: true, 
+            deleted: result.deletedCount,
+            message: `${result.deletedCount} partidos eliminados exitosamente`
+        });
+    } catch (error) {
+        console.error('❌ Error eliminando partidos:', error);
+        res.status(500).json({ error: 'Error interno del servidor', details: error.message });
+    }
+});
 
 // Obtener todos los partidos
 app.get('/api/matches', async (req, res) => {
     try {
         const matches = await Match.find().sort({ date: 1 });
+        console.log(`📊 API /api/matches devolviendo ${matches.length} partidos`);
         res.json(matches);
     } catch (error) {
         console.error('❌ Error obteniendo partidos:', error);
@@ -1353,11 +1381,7 @@ app.get('/api/stats', async (req, res) => {
 app.get('/api/settings', (req, res) => {
     res.json({
         seasonName: 'Temporada 2025',
-        classificationZones: [
-            { id: 1, name: 'Clasificación Directa', positions: '1-4', color: '#00ff88' },
-            { id: 2, name: 'Repechaje', positions: '5-8', color: '#ffa500' },
-            { id: 3, name: 'Eliminación', positions: '9-12', color: '#ff4757' }
-        ]
+        // Zonas de clasificación eliminadas
     });
 });
 
@@ -1408,6 +1432,7 @@ app.post('/api/matches', async (req, res) => {
 app.get('/api/matches', async (req, res) => {
     try {
         const matches = await Match.find().sort({ date: 1 });
+        console.log(`📊 API /api/matches devolviendo ${matches.length} partidos`);
         res.json(matches);
     } catch (error) {
         console.error('❌ Error obteniendo partidos:', error);
@@ -1493,77 +1518,73 @@ app.delete('/api/matches/:id', async (req, res) => {
     }
 });
 
-// ==================== CONFIGURATION API ====================
-
-// Endpoint para obtener configuración de zonas de clasificación
-app.get('/api/settings/classification-zones', async (req, res) => {
+// Generar partidos automáticamente
+app.post('/api/matches/generate', async (req, res) => {
     try {
-        // Buscar configuración existente en MongoDB
-        let savedSettings = await Settings.findOne({ key: 'classificationZones' });
+        const { matches } = req.body;
         
-        let classificationZones;
-        if (savedSettings) {
-            classificationZones = savedSettings.value;
-            console.log('✅ Zonas de clasificación cargadas desde MongoDB:', classificationZones.length);
-        } else {
-            // Zonas de clasificación por defecto
-            classificationZones = [
-                { id: 1, name: 'Clasificación Directa', positions: '1-4', color: '#00ff88' },
-                { id: 2, name: 'Repechaje', positions: '5-8', color: '#ffa500' },
-                { id: 3, name: 'Eliminación', positions: '9-12', color: '#ff4757' }
-            ];
-            console.log('⚠️ Usando zonas de clasificación por defecto');
+        if (!matches || !Array.isArray(matches)) {
+            return res.status(400).json({ error: 'Datos de partidos inválidos' });
         }
+        
+        console.log(`🎯 Generando ${matches.length} partidos automáticamente`);
+        
+        let created = 0;
+        let skipped = 0;
+        
+        for (const matchData of matches) {
+            const { homeTeam, awayTeam, date, time, matchday } = matchData;
+            
+            // Verificar si el partido ya existe
+            const existingMatch = await Match.findOne({
+                homeTeam,
+                awayTeam,
+                date,
+                matchday
+            });
+            
+            if (existingMatch) {
+                console.log(`⚠️ Partido ya existe: ${homeTeam} vs ${awayTeam} - ${date}`);
+                skipped++;
+                continue;
+            }
+            
+            // Crear nuevo partido
+            const newMatch = new Match({
+                homeTeam,
+                awayTeam,
+                date: date || null,
+                time: time || null,
+                matchday,
+                homeScore: null,
+                awayScore: null,
+                status: 'scheduled'
+            });
+            
+            const savedMatch = await newMatch.save();
+            created++;
+            
+            console.log(`✅ Partido creado: ${homeTeam} vs ${awayTeam} - J${matchday} - ${date} ${time}`);
+            console.log(`📊 Partido guardado en DB:`, savedMatch._id);
+        }
+        
+        console.log(`📊 Resumen generación: ${created} creados, ${skipped} omitidos`);
+        
+        // Emitir eventos WebSocket para actualización en tiempo real
+        const allMatches = await Match.find().sort({ date: 1 });
+        io.emit('matchesUpdate', allMatches);
+        io.emit('matchesGenerated', { created, skipped, total: matches.length });
         
         res.json({
             success: true,
-            classificationZones: classificationZones
+            created,
+            skipped,
+            total: matches.length,
+            message: `${created} partidos generados exitosamente${skipped > 0 ? `, ${skipped} omitidos por duplicados` : ''}`
         });
+        
     } catch (error) {
-        console.error('Error loading classification zones:', error);
-        res.status(500).json({ error: 'Error interno del servidor' });
-    }
-});
-
-// Endpoint para actualizar zonas de clasificación
-app.post('/api/settings/classification-zones', async (req, res) => {
-    try {
-        const { classificationZones } = req.body;
-        
-        if (!classificationZones || !Array.isArray(classificationZones)) {
-            return res.status(400).json({ error: 'Zonas de clasificación inválidas' });
-        }
-        
-        // Validar estructura de cada zona
-        for (const zone of classificationZones) {
-            if (!zone.name || !zone.positions || !zone.color) {
-                return res.status(400).json({ error: 'Estructura de zona inválida' });
-            }
-        }
-        
-        // Guardar en MongoDB usando upsert (actualizar si existe, crear si no existe)
-        await Settings.findOneAndUpdate(
-            { key: 'classificationZones' },
-            { 
-                key: 'classificationZones',
-                value: classificationZones,
-                updatedAt: new Date()
-            },
-            { upsert: true, new: true }
-        );
-        
-        console.log('✅ Zonas de clasificación guardadas en MongoDB:', classificationZones.length);
-        
-        // Emitir evento WebSocket para actualización en tiempo real
-        io.emit('classificationZonesUpdate', classificationZones);
-        
-        res.json({ 
-            success: true, 
-            message: 'Zonas de clasificación guardadas correctamente en la base de datos',
-            classificationZones: classificationZones
-        });
-    } catch (error) {
-        console.error('Error saving classification zones to MongoDB:', error);
+        console.error('❌ Error generando partidos:', error);
         res.status(500).json({ error: 'Error interno del servidor' });
     }
 });
@@ -2248,6 +2269,12 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
+// Copa endpoints eliminados
+
+
+
+
+
 app.get('/admin.html', (req, res) => {
     res.redirect('/login.html');
 });
@@ -2268,6 +2295,748 @@ app.get('/jugadores.html', (req, res) => {
     res.sendFile(path.join(__dirname, 'jugadores.html'));
 });
 
+// ==================== ENDPOINTS DE EQUIPOS ====================
+
+// GET - Obtener todos los equipos
+app.get('/api/teams', async (req, res) => {
+    try {
+        const teams = await Team.find().sort({ name: 1 });
+        res.json(teams);
+    } catch (error) {
+        console.error('❌ Error obteniendo equipos:', error);
+        res.status(500).json({ error: 'Error obteniendo equipos' });
+    }
+});
+
+// POST - Crear nuevo equipo
+app.post('/api/teams', uploadImage.single('logo'), async (req, res) => {
+    try {
+        const { name, description } = req.body;
+        
+        if (!name) {
+            return res.status(400).json({ error: 'El nombre del equipo es obligatorio' });
+        }
+        
+        // Verificar si ya existe un equipo con ese nombre
+        const existingTeam = await Team.findOne({ name: name.trim() });
+        if (existingTeam) {
+            return res.status(400).json({ error: 'Ya existe un equipo con ese nombre' });
+        }
+        
+        let logoUrl = '/images/default-team-logo.png'; // Logo por defecto
+        
+        // Si se subió un archivo de logo
+        if (req.file) {
+            try {
+                if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) {
+                    // Subir a Cloudinary
+                    const uploadResult = await new Promise((resolve, reject) => {
+                        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+                        const publicId = `team-logo-${uniqueSuffix}`;
+                        
+                        cloudinary.uploader.upload_stream(
+                            {
+                                resource_type: 'image',
+                                public_id: publicId,
+                                folder: 'lpcp-teams',
+                                quality: 'auto:good',
+                                format: 'png',
+                                transformation: [
+                                    { width: 200, height: 200, crop: 'fit', quality: 'auto:good' }
+                                ]
+                            },
+                            (error, result) => {
+                                if (error) {
+                                    reject(error);
+                                } else {
+                                    resolve(result);
+                                }
+                            }
+                        ).end(req.file.buffer);
+                    });
+                    
+                    logoUrl = uploadResult.secure_url;
+                    console.log('✅ Logo subido a Cloudinary:', logoUrl);
+                } else {
+                    // Fallback a almacenamiento local
+                    const uploadsDir = path.join(__dirname, 'uploads');
+                    if (!fs.existsSync(uploadsDir)) {
+                        fs.mkdirSync(uploadsDir, { recursive: true });
+                    }
+                    
+                    const filename = `team-${Date.now()}-${Math.round(Math.random() * 1E9)}.${req.file.originalname.split('.').pop()}`;
+                    const filepath = path.join(uploadsDir, filename);
+                    
+                    fs.writeFileSync(filepath, req.file.buffer);
+                    logoUrl = `/uploads/${filename}`;
+                    console.log('✅ Logo guardado localmente:', logoUrl);
+                }
+            } catch (uploadError) {
+                console.error('❌ Error subiendo logo:', uploadError);
+                // Continuar con logo por defecto
+            }
+        }
+        
+        // Crear nuevo equipo
+        const newTeam = new Team({
+            name: name.trim(),
+            description: description?.trim() || '',
+            logo: logoUrl,
+            founded: new Date().getFullYear(),
+            players: 0
+        });
+        
+        const savedTeam = await newTeam.save();
+        
+        // Crear club asociado automáticamente
+        const newClub = new Club({
+            name: name.trim(),
+            description: description?.trim() || `Club oficial del equipo ${name.trim()}`,
+            image: logoUrl,
+            founded: new Date().getFullYear()
+        });
+        
+        await newClub.save();
+        
+        console.log(`✅ Equipo "${name}" creado con ID: ${savedTeam._id}`);
+        console.log(`✅ Club "${name}" creado automáticamente`);
+        
+        // Emitir eventos WebSocket
+        io.emit('teamsUpdate', await Team.find().sort({ name: 1 }));
+        io.emit('clubsUpdate', await Club.find().sort({ name: 1 }));
+        
+        res.json({ 
+            success: true, 
+            team: savedTeam,
+            message: 'Equipo creado exitosamente'
+        });
+        
+    } catch (error) {
+        console.error('❌ Error creando equipo:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+});
+
+// PUT - Actualizar equipo
+app.put('/api/teams/:id', uploadImage.single('logo'), async (req, res) => {
+    try {
+        const { name, description } = req.body;
+        const teamId = req.params.id;
+        
+        if (!name) {
+            return res.status(400).json({ error: 'El nombre del equipo es obligatorio' });
+        }
+        
+        const team = await Team.findById(teamId);
+        if (!team) {
+            return res.status(404).json({ error: 'Equipo no encontrado' });
+        }
+        
+        // Verificar nombre duplicado (excluyendo el equipo actual)
+        const existingTeam = await Team.findOne({ 
+            name: name.trim(), 
+            _id: { $ne: teamId } 
+        });
+        if (existingTeam) {
+            return res.status(400).json({ error: 'Ya existe otro equipo con ese nombre' });
+        }
+        
+        let logoUrl = team.logo; // Mantener logo actual por defecto
+        
+        // Si se debe eliminar el logo
+        if (req.body.removeLogo === 'true') {
+            logoUrl = null;
+            console.log('🗑️ Logo eliminado del equipo');
+        }
+        // Si se subió un nuevo logo
+        else if (req.file) {
+            try {
+                if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) {
+                    // Subir a Cloudinary
+                    const uploadResult = await new Promise((resolve, reject) => {
+                        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+                        const publicId = `team-logo-${uniqueSuffix}`;
+                        
+                        cloudinary.uploader.upload_stream(
+                            {
+                                resource_type: 'image',
+                                public_id: publicId,
+                                folder: 'lpcp-teams',
+                                quality: 'auto:good',
+                                format: 'png',
+                                transformation: [
+                                    { width: 200, height: 200, crop: 'fit', quality: 'auto:good' }
+                                ]
+                            },
+                            (error, result) => {
+                                if (error) {
+                                    reject(error);
+                                } else {
+                                    resolve(result);
+                                }
+                            }
+                        ).end(req.file.buffer);
+                    });
+                    
+                    logoUrl = uploadResult.secure_url;
+                    console.log('✅ Nuevo logo subido a Cloudinary:', logoUrl);
+                }
+            } catch (uploadError) {
+                console.error('❌ Error subiendo nuevo logo:', uploadError);
+                // Mantener logo actual
+            }
+        }
+        
+        // Actualizar equipo
+        const updatedTeam = await Team.findByIdAndUpdate(
+            teamId,
+            {
+                name: name.trim(),
+                description: description?.trim() || '',
+                logo: logoUrl,
+                updatedAt: new Date()
+            },
+            { new: true }
+        );
+        
+        console.log(`✅ Equipo "${name}" actualizado`);
+        
+        // Emitir evento WebSocket
+        io.emit('teamsUpdate', await Team.find().sort({ name: 1 }));
+        
+        res.json({ 
+            success: true, 
+            team: updatedTeam,
+            message: 'Equipo actualizado exitosamente'
+        });
+        
+    } catch (error) {
+        console.error('❌ Error actualizando equipo:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+});
+
+// DELETE - Eliminar equipo
+app.delete('/api/teams/:id', async (req, res) => {
+    try {
+        const teamId = req.params.id;
+        
+        const team = await Team.findById(teamId);
+        if (!team) {
+            return res.status(404).json({ error: 'Equipo no encontrado' });
+        }
+        
+        const teamName = team.name;
+        
+        // Eliminar equipo
+        await Team.findByIdAndDelete(teamId);
+        
+        // Eliminar jugadores del equipo
+        await Player.deleteMany({ clubName: teamName });
+        
+        // Eliminar club asociado
+        await Club.deleteOne({ name: teamName });
+        
+        console.log(`✅ Equipo "${teamName}" eliminado junto con sus jugadores y club`);
+        
+        // Emitir eventos WebSocket
+        io.emit('teamsUpdate', await Team.find().sort({ name: 1 }));
+        io.emit('playersUpdate', await Player.find().sort({ name: 1 }));
+        io.emit('clubsUpdate', await Club.find().sort({ name: 1 }));
+        
+        res.json({ 
+            success: true, 
+            message: 'Equipo eliminado exitosamente'
+        });
+        
+    } catch (error) {
+        console.error('❌ Error eliminando equipo:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+});
+
+// ==================== ENDPOINTS DE JUGADORES ====================
+
+// GET - Obtener todos los jugadores
+app.get('/api/players', async (req, res) => {
+    try {
+        const players = await Player.find().sort({ clubName: 1, number: 1 });
+        res.json(players);
+    } catch (error) {
+        console.error('❌ Error obteniendo jugadores:', error);
+        res.status(500).json({ error: 'Error obteniendo jugadores' });
+    }
+});
+
+// POST - Crear nuevo jugador
+app.post('/api/players', uploadImage.single('photo'), async (req, res) => {
+    try {
+        const { name, age, position, number, clubName, nationality } = req.body;
+        
+        if (!name || !clubName) {
+            return res.status(400).json({ error: 'Nombre y club son obligatorios' });
+        }
+        
+        // Verificar que el equipo existe
+        const team = await Team.findOne({ name: clubName });
+        if (!team) {
+            return res.status(400).json({ error: 'El equipo especificado no existe' });
+        }
+        
+        // Verificar número único por equipo (si se especifica)
+        if (number) {
+            const existingPlayer = await Player.findOne({ 
+                clubName: clubName, 
+                number: parseInt(number) 
+            });
+            if (existingPlayer) {
+                return res.status(400).json({ error: `El número ${number} ya está ocupado en ${clubName}` });
+            }
+        }
+        
+        let photoUrl = '/images/default-player.png'; // Foto por defecto
+        
+        // Si se subió una foto
+        if (req.file) {
+            try {
+                if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) {
+                    // Subir a Cloudinary
+                    const uploadResult = await new Promise((resolve, reject) => {
+                        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+                        const publicId = `player-photo-${uniqueSuffix}`;
+                        
+                        cloudinary.uploader.upload_stream(
+                            {
+                                resource_type: 'image',
+                                public_id: publicId,
+                                folder: 'lpcp-players',
+                                quality: 'auto:good',
+                                format: 'jpg',
+                                transformation: [
+                                    { width: 300, height: 400, crop: 'fit', quality: 'auto:good' }
+                                ]
+                            },
+                            (error, result) => {
+                                if (error) {
+                                    reject(error);
+                                } else {
+                                    resolve(result);
+                                }
+                            }
+                        ).end(req.file.buffer);
+                    });
+                    
+                    photoUrl = uploadResult.secure_url;
+                    console.log('✅ Foto subida a Cloudinary:', photoUrl);
+                }
+            } catch (uploadError) {
+                console.error('❌ Error subiendo foto:', uploadError);
+                // Continuar con foto por defecto
+            }
+        }
+        
+        // Crear nuevo jugador
+        const newPlayer = new Player({
+            name: name.trim(),
+            age: age ? parseInt(age) : null,
+            position: position || 'Jugador',
+            number: number ? parseInt(number) : null,
+            clubName: clubName.trim(),
+            nationality: nationality?.trim() || 'Panamá',
+            photo: photoUrl,
+            goals: 0,
+            assists: 0
+        });
+        
+        const savedPlayer = await newPlayer.save();
+        
+        // Actualizar contador de jugadores del equipo
+        await Team.findOneAndUpdate(
+            { name: clubName },
+            { $inc: { players: 1 } }
+        );
+        
+        console.log(`✅ Jugador "${name}" creado en ${clubName}`);
+        
+        // Emitir eventos WebSocket
+        io.emit('playersUpdate', await Player.find().sort({ clubName: 1, number: 1 }));
+        io.emit('teamsUpdate', await Team.find().sort({ name: 1 }));
+        
+        res.json({ 
+            success: true, 
+            player: savedPlayer,
+            message: 'Jugador creado exitosamente'
+        });
+        
+    } catch (error) {
+        console.error('❌ Error creando jugador:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+});
+
+// PUT - Actualizar jugador
+app.put('/api/players/:id', uploadImage.single('photo'), async (req, res) => {
+    try {
+        const { name, age, position, number, nationality, goals, assists } = req.body;
+        const playerId = req.params.id;
+        
+        const player = await Player.findById(playerId);
+        if (!player) {
+            return res.status(404).json({ error: 'Jugador no encontrado' });
+        }
+        
+        // Verificar número único por equipo (si se cambia)
+        if (number && parseInt(number) !== player.number) {
+            const existingPlayer = await Player.findOne({ 
+                clubName: player.clubName, 
+                number: parseInt(number),
+                _id: { $ne: playerId }
+            });
+            if (existingPlayer) {
+                return res.status(400).json({ error: `El número ${number} ya está ocupado en ${player.clubName}` });
+            }
+        }
+        
+        let photoUrl = player.photo; // Mantener foto actual
+        
+        // Si se subió una nueva foto
+        if (req.file) {
+            try {
+                if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) {
+                    // Subir a Cloudinary
+                    const uploadResult = await new Promise((resolve, reject) => {
+                        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+                        const publicId = `player-photo-${uniqueSuffix}`;
+                        
+                        cloudinary.uploader.upload_stream(
+                            {
+                                resource_type: 'image',
+                                public_id: publicId,
+                                folder: 'lpcp-players',
+                                quality: 'auto:good',
+                                format: 'jpg',
+                                transformation: [
+                                    { width: 300, height: 400, crop: 'fit', quality: 'auto:good' }
+                                ]
+                            },
+                            (error, result) => {
+                                if (error) {
+                                    reject(error);
+                                } else {
+                                    resolve(result);
+                                }
+                            }
+                        ).end(req.file.buffer);
+                    });
+                    
+                    photoUrl = uploadResult.secure_url;
+                    console.log('✅ Nueva foto subida a Cloudinary:', photoUrl);
+                }
+            } catch (uploadError) {
+                console.error('❌ Error subiendo nueva foto:', uploadError);
+                // Mantener foto actual
+            }
+        }
+        
+        // Actualizar jugador
+        const updatedPlayer = await Player.findByIdAndUpdate(
+            playerId,
+            {
+                name: name?.trim() || player.name,
+                age: age ? parseInt(age) : player.age,
+                position: position || player.position,
+                number: number ? parseInt(number) : player.number,
+                nationality: nationality?.trim() || player.nationality,
+                photo: photoUrl,
+                goals: goals !== undefined ? parseInt(goals) || 0 : player.goals,
+                assists: assists !== undefined ? parseInt(assists) || 0 : player.assists,
+                updatedAt: new Date()
+            },
+            { new: true }
+        );
+        
+        console.log(`✅ Jugador "${updatedPlayer.name}" actualizado`);
+        
+        // Emitir eventos WebSocket
+        io.emit('playersUpdate', await Player.find().sort({ clubName: 1, number: 1 }));
+        io.emit('playerStatsUpdated', updatedPlayer);
+        
+        res.json({ 
+            success: true, 
+            player: updatedPlayer,
+            message: 'Jugador actualizado exitosamente'
+        });
+        
+    } catch (error) {
+        console.error('❌ Error actualizando jugador:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+});
+
+// DELETE - Eliminar jugador
+app.delete('/api/players/:id', async (req, res) => {
+    try {
+        const playerId = req.params.id;
+        
+        const player = await Player.findById(playerId);
+        if (!player) {
+            return res.status(404).json({ error: 'Jugador no encontrado' });
+        }
+        
+        const playerName = player.name;
+        const clubName = player.clubName;
+        
+        // Eliminar jugador
+        await Player.findByIdAndDelete(playerId);
+        
+        // Actualizar contador de jugadores del equipo
+        await Team.findOneAndUpdate(
+            { name: clubName },
+            { $inc: { players: -1 } }
+        );
+        
+        console.log(`✅ Jugador "${playerName}" eliminado de ${clubName}`);
+        
+        // Emitir eventos WebSocket
+        io.emit('playersUpdate', await Player.find().sort({ clubName: 1, number: 1 }));
+        io.emit('teamsUpdate', await Team.find().sort({ name: 1 }));
+        
+        res.json({ 
+            success: true, 
+            message: 'Jugador eliminado exitosamente'
+        });
+        
+    } catch (error) {
+        console.error('❌ Error eliminando jugador:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+});
+
+// ==================== ENDPOINTS DE CLUBES ====================
+
+// GET - Obtener todos los clubes
+app.get('/api/clubs', async (req, res) => {
+    try {
+        const clubs = await Club.find().sort({ name: 1 });
+        res.json(clubs);
+    } catch (error) {
+        console.error('❌ Error obteniendo clubes:', error);
+        res.status(500).json({ error: 'Error obteniendo clubes' });
+    }
+});
+
+// POST - Crear nuevo club
+app.post('/api/clubs', uploadImage.single('image'), async (req, res) => {
+    try {
+        const { name, description, founded } = req.body;
+        
+        if (!name) {
+            return res.status(400).json({ error: 'El nombre del club es obligatorio' });
+        }
+        
+        // Verificar si ya existe un club con ese nombre
+        const existingClub = await Club.findOne({ name: name.trim() });
+        if (existingClub) {
+            return res.status(400).json({ error: 'Ya existe un club con ese nombre' });
+        }
+        
+        let imageUrl = '/images/default-club.png'; // Imagen por defecto
+        
+        // Si se subió una imagen
+        if (req.file) {
+            try {
+                if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) {
+                    // Subir a Cloudinary
+                    const uploadResult = await new Promise((resolve, reject) => {
+                        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+                        const publicId = `club-image-${uniqueSuffix}`;
+                        
+                        cloudinary.uploader.upload_stream(
+                            {
+                                resource_type: 'image',
+                                public_id: publicId,
+                                folder: 'lpcp-clubs',
+                                quality: 'auto:good',
+                                format: 'jpg',
+                                transformation: [
+                                    { width: 400, height: 300, crop: 'fit', quality: 'auto:good' }
+                                ]
+                            },
+                            (error, result) => {
+                                if (error) {
+                                    reject(error);
+                                } else {
+                                    resolve(result);
+                                }
+                            }
+                        ).end(req.file.buffer);
+                    });
+                    
+                    imageUrl = uploadResult.secure_url;
+                    console.log('✅ Imagen subida a Cloudinary:', imageUrl);
+                }
+            } catch (uploadError) {
+                console.error('❌ Error subiendo imagen:', uploadError);
+                // Continuar con imagen por defecto
+            }
+        }
+        
+        // Crear nuevo club
+        const newClub = new Club({
+            name: name.trim(),
+            description: description?.trim() || '',
+            image: imageUrl,
+            founded: founded ? parseInt(founded) : new Date().getFullYear()
+        });
+        
+        const savedClub = await newClub.save();
+        
+        console.log(`✅ Club "${name}" creado con ID: ${savedClub._id}`);
+        
+        // Emitir evento WebSocket
+        io.emit('clubsUpdate', await Club.find().sort({ name: 1 }));
+        
+        res.json({ 
+            success: true, 
+            club: savedClub,
+            message: 'Club creado exitosamente'
+        });
+        
+    } catch (error) {
+        console.error('❌ Error creando club:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+});
+
+// PUT - Actualizar club
+app.put('/api/clubs/:id', uploadImage.single('image'), async (req, res) => {
+    try {
+        const { name, description, founded } = req.body;
+        const clubId = req.params.id;
+        
+        const club = await Club.findById(clubId);
+        if (!club) {
+            return res.status(404).json({ error: 'Club no encontrado' });
+        }
+        
+        // Verificar nombre duplicado (excluyendo el club actual)
+        if (name && name.trim() !== club.name) {
+            const existingClub = await Club.findOne({ 
+                name: name.trim(), 
+                _id: { $ne: clubId } 
+            });
+            if (existingClub) {
+                return res.status(400).json({ error: 'Ya existe otro club con ese nombre' });
+            }
+        }
+        
+        let imageUrl = club.image; // Mantener imagen actual
+        
+        // Si se subió una nueva imagen
+        if (req.file) {
+            try {
+                if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) {
+                    // Subir a Cloudinary
+                    const uploadResult = await new Promise((resolve, reject) => {
+                        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+                        const publicId = `club-image-${uniqueSuffix}`;
+                        
+                        cloudinary.uploader.upload_stream(
+                            {
+                                resource_type: 'image',
+                                public_id: publicId,
+                                folder: 'lpcp-clubs',
+                                quality: 'auto:good',
+                                format: 'jpg',
+                                transformation: [
+                                    { width: 400, height: 300, crop: 'fit', quality: 'auto:good' }
+                                ]
+                            },
+                            (error, result) => {
+                                if (error) {
+                                    reject(error);
+                                } else {
+                                    resolve(result);
+                                }
+                            }
+                        ).end(req.file.buffer);
+                    });
+                    
+                    imageUrl = uploadResult.secure_url;
+                    console.log('✅ Nueva imagen subida a Cloudinary:', imageUrl);
+                }
+            } catch (uploadError) {
+                console.error('❌ Error subiendo nueva imagen:', uploadError);
+                // Mantener imagen actual
+            }
+        }
+        
+        // Actualizar club
+        const updatedClub = await Club.findByIdAndUpdate(
+            clubId,
+            {
+                name: name?.trim() || club.name,
+                description: description?.trim() || club.description,
+                image: imageUrl,
+                founded: founded ? parseInt(founded) : club.founded,
+                updatedAt: new Date()
+            },
+            { new: true }
+        );
+        
+        console.log(`✅ Club "${updatedClub.name}" actualizado`);
+        
+        // Emitir evento WebSocket
+        io.emit('clubsUpdate', await Club.find().sort({ name: 1 }));
+        
+        res.json({ 
+            success: true, 
+            club: updatedClub,
+            message: 'Club actualizado exitosamente'
+        });
+        
+    } catch (error) {
+        console.error('❌ Error actualizando club:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+});
+
+// DELETE - Eliminar club
+app.delete('/api/clubs/:id', async (req, res) => {
+    try {
+        const clubId = req.params.id;
+        
+        const club = await Club.findById(clubId);
+        if (!club) {
+            return res.status(404).json({ error: 'Club no encontrado' });
+        }
+        
+        const clubName = club.name;
+        
+        // Eliminar club
+        await Club.findByIdAndDelete(clubId);
+        
+        console.log(`✅ Club "${clubName}" eliminado`);
+        
+        // Emitir evento WebSocket
+        io.emit('clubsUpdate', await Club.find().sort({ name: 1 }));
+        
+        res.json({ 
+            success: true, 
+            message: 'Club eliminado exitosamente'
+        });
+        
+    } catch (error) {
+        console.error('❌ Error eliminando club:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+});
+
+
+
+
+
+
 // ==================== WEBSOCKETS ====================
 io.on('connection', async (socket) => {
     console.log('Usuario conectado:', socket.id);
@@ -2287,7 +3056,7 @@ io.on('connection', async (socket) => {
 });
 
 // ==================== INICIAR SERVIDOR ====================
-console.log('🚀 Iniciando servidor LPCP limpio...');
+console.log('🚀 Iniciando servidor ASP limpio...');
 console.log('💾 MongoDB: Equipos, jugadores, clubes, partidos');
 console.log('🎥 Cloudinary: Videos de clips');
 console.log('📝 Archivos locales: Solo metadatos de clips');

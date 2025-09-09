@@ -3,11 +3,14 @@
 
 let socket;
 let clubsData = [];
+let teamsData = [];
+let playersData = [];
 
 // Inicializar cuando se carga la página
 document.addEventListener('DOMContentLoaded', function() {
     initializeWebSocket();
     loadClubs();
+    loadDynamicStats();
 });
 
 // Inicializar WebSocket para actualizaciones en tiempo real
@@ -20,6 +23,20 @@ function initializeWebSocket() {
             console.log('📡 Actualización de clubes recibida:', updatedClubs);
             clubsData = updatedClubs;
             renderClubs();
+        });
+        
+        // Escuchar actualizaciones de equipos
+        socket.on('teamsUpdate', function(updatedTeams) {
+            console.log('📡 Actualización de equipos recibida:', updatedTeams);
+            teamsData = updatedTeams;
+            updateTeamsCounter();
+        });
+        
+        // Escuchar actualizaciones de jugadores
+        socket.on('playersUpdate', function(updatedPlayers) {
+            console.log('📡 Actualización de jugadores recibida:', updatedPlayers);
+            playersData = updatedPlayers;
+            updatePlayersCounter();
         });
         
         socket.on('connect', function() {
@@ -143,6 +160,76 @@ function refreshClubs() {
     loadClubs();
 }
 
+// Cargar estadísticas dinámicas (equipos y jugadores)
+async function loadDynamicStats() {
+    try {
+        // Cargar equipos
+        const teamsResponse = await fetch('/api/teams');
+        if (teamsResponse.ok) {
+            teamsData = await teamsResponse.json();
+            updateTeamsCounter();
+        }
+        
+        // Cargar jugadores
+        const playersResponse = await fetch('/api/players');
+        if (playersResponse.ok) {
+            playersData = await playersResponse.json();
+            updatePlayersCounter();
+        }
+        
+    } catch (error) {
+        console.error('❌ Error cargando estadísticas dinámicas:', error);
+    }
+}
+
+// Actualizar contador de equipos con animación
+function updateTeamsCounter() {
+    const teamsCounter = document.querySelector('.stat-item:first-child .stat-number');
+    if (teamsCounter) {
+        const targetCount = teamsData.length;
+        animateCounter(teamsCounter, targetCount);
+    }
+}
+
+// Actualizar contador de jugadores con animación
+function updatePlayersCounter() {
+    const playersCounter = document.querySelector('.stat-item:nth-child(2) .stat-number');
+    if (playersCounter) {
+        const targetCount = playersData.length;
+        animateCounter(playersCounter, targetCount);
+    }
+}
+
+// Animar contador con efecto de incremento
+function animateCounter(element, targetValue) {
+    const currentValue = parseInt(element.textContent) || 0;
+    const increment = targetValue > currentValue ? 1 : -1;
+    const duration = 1000; // 1 segundo
+    const steps = Math.abs(targetValue - currentValue);
+    const stepDuration = steps > 0 ? duration / steps : 0;
+    
+    if (steps === 0) return;
+    
+    let current = currentValue;
+    const timer = setInterval(() => {
+        current += increment;
+        element.textContent = current;
+        
+        if (current === targetValue) {
+            clearInterval(timer);
+        }
+    }, stepDuration);
+}
+
+// Función para refrescar estadísticas manualmente
+function refreshStats() {
+    console.log('🔄 Refrescando estadísticas...');
+    loadDynamicStats();
+}
+
 // Exponer funciones globalmente para debugging
 window.refreshClubs = refreshClubs;
+window.refreshStats = refreshStats;
 window.clubsData = clubsData;
+window.teamsData = teamsData;
+window.playersData = playersData;

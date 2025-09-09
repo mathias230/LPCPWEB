@@ -348,7 +348,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Typewriter effect for main title
     const mainTitle = document.querySelector('.typewriter-text');
-    const titleText = 'Liga Panameña de Clubes Pro';
+    const titleText = 'AMERICA PRO CLUBS';
     setTimeout(() => {
         typeWriterTitle(mainTitle, titleText, 120);
     }, 800);

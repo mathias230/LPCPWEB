@@ -2368,6 +2368,11 @@ io.on('connection', (socket) => {
     
     socket.emit('statsUpdate', stats);
     
+    socket.on('classificationZonesChanged', (zones) => {
+        console.log('📡 Recibido evento classificationZonesChanged, broadcasting a todos los clientes');
+        socket.broadcast.emit('classificationZonesUpdate', zones);
+    });
+
     socket.on('disconnect', () => {
         console.log('Usuario desconectado:', socket.id);
     });

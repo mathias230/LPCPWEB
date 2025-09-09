@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tabla de Posiciones - Liga Panameña de Clubes Pro</title>
+    <title>Tabla de Posiciones - AMERICA PRO CLUBS</title>
     <link rel="stylesheet" href="styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
@@ -14,9 +14,9 @@
         <div class="nav-container">
             <div class="nav-logo">
                 <div class="logo-circle">
-                    <img src="/img/LPCP Logo.jpg" alt="Logo LPCP" class="logo-img">
+                    <img src="/img/ASP LOGO.png" alt="ASP LOGO" class="logo-img">
                 </div>
-                <span>LPCP</span>
+                <span>ASP</span>
             </div>
             <ul class="nav-menu">
                 <li><a href="index.html" class="nav-link">Inicio</a></li>
@@ -46,7 +46,7 @@
             <h1 class="hero-title">
                 <span class="typewriter-text">Tabla de Posiciones</span>
             </h1>
-            <p class="hero-subtitle">Clasificación actual de la Liga Panameña de Clubes Pro</p>
+            <p class="hero-subtitle">Clasificación actual de la AMERICA PRO CLUBS</p>
             
             <!-- Season Info -->
             <div class="season-info">
@@ -129,14 +129,6 @@
                         </table>
                     </div>
 
-                    <!-- Leyenda Dinámica de Zonas de Clasificación -->
-                    <div class="table-legend" id="classificationLegend">
-                        <!-- Las zonas de clasificación se cargarán dinámicamente aquí -->
-                        <div class="legend-loading">
-                            <i class="fas fa-spinner fa-spin"></i>
-                            <span>Cargando zonas de clasificación...</span>
-                        </div>
-                    </div>
                 </div>
             </div>
 
@@ -324,6 +316,8 @@
                 </div>
             </div>
 
+
+
             <!-- Schedule Tab -->
             <div class="tab-content" id="schedule">
                 <div class="schedule-container">
@@ -486,15 +480,64 @@
             <div class="footer-content">
                 <div class="footer-logo">
                     <i class="fas fa-trophy"></i>
-                    <span>LPCP</span>
+                    <span>ASP</span>
                 </div>
-                <p>&copy; 2025 Liga Panameña de Clubes Pro. Diseño por: Web Zen design Studio.</p>
+                <p>&copy; 2025 AMERICA PRO CLUBS. Diseño por: Web Zen design Studio.</p>
             </div>
         </div>
     </footer>
 
     <!-- Scripts -->
     <script src="/socket.io/socket.io.js"></script>
+    <script>
+        // Debug: Verificar que los elementos existen antes de cargar standings.js
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🔍 DEBUG: Verificando elementos...');
+            
+            // Verificar botones
+            const tabBtns = document.querySelectorAll('.tab-btn');
+            console.log('📊 Botones encontrados:', tabBtns.length);
+            tabBtns.forEach((btn, i) => {
+                console.log(`Botón ${i+1}: data-tab="${btn.getAttribute('data-tab')}"`);
+            });
+            
+            // Verificar contenedores
+            const tabContents = document.querySelectorAll('.tab-content');
+            console.log('📦 Contenedores encontrados:', tabContents.length);
+            tabContents.forEach((content, i) => {
+                console.log(`Contenedor ${i+1}: id="${content.id}"`);
+            });
+            
+            // Test manual de cambio de pestaña
+            window.testTab = function(tabId) {
+                console.log('🧪 TEST: Cambiando a', tabId);
+                
+                // Remover active de todos
+                document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+                
+                // Activar específicos
+                const btn = document.querySelector(`[data-tab="${tabId}"]`);
+                const content = document.getElementById(tabId);
+                
+                if (btn) {
+                    btn.classList.add('active');
+                    console.log('✅ Botón activado');
+                } else {
+                    console.error('❌ Botón no encontrado');
+                }
+                
+                if (content) {
+                    content.classList.add('active');
+                    console.log('✅ Contenido activado');
+                } else {
+                    console.error('❌ Contenido no encontrado');
+                }
+            };
+            
+            console.log('💡 Usa testTab("fixtures") en la consola para probar');
+        });
+    </script>
     <script src="standings.js"></script>
 </body>
 </html>
